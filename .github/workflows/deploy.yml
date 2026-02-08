@@ -41,6 +41,7 @@ jobs:
   build-and-deploy:
     needs: lint-and-test
     runs-on: ubuntu-latest
+    environment: gitunderstand
     steps:
       - uses: actions/checkout@v4
 
