@@ -1,0 +1,80 @@
+[project]
+name = "gitunderstand"
+version = "0.1.0"
+description = "Convert Git repositories into LLM-friendly text digests with code intelligence"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">= 3.11"
+dependencies = [
+    "click>=8.0.0",
+    "fastapi[standard]>=0.109.1",
+    "gitpython>=3.1.0",
+    "httpx",
+    "jinja2",
+    "pathspec>=0.12.1",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv",
+    "slowapi",
+    "structlog",
+    "tiktoken>=0.7.0",
+    "uvicorn>=0.20.0",
+]
+
+license = {file = "LICENSE"}
+authors = [
+    {name = "GitUnderstand Contributors"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock",
+    "ruff",
+]
+
+[project.scripts]
+gitunderstand = "core.__main__:main"
+
+[project.urls]
+homepage = "https://gitunderstand.com"
+github = "https://github.com/REDFOX1899/gitunderstand"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = {find = {where = ["src"]}}
+include-package-data = true
+
+[tool.ruff]
+line-length = 119
+fix = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "SIM", "TCH"]
+ignore = [
+    "S108",  # hardcoded-temp-file
+]
+per-file-ignores = {"tests/**/*.py" = ["S101"]}
+
+[tool.ruff.lint.isort]
+order-by-type = true
+case-sensitive = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests/"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+python_classes = "Test*"
+python_functions = "test_*"

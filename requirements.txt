@@ -1,0 +1,13 @@
+click>=8.0.0
+fastapi[standard]>=0.109.1
+gitpython>=3.1.0
+httpx
+jinja2
+pathspec>=0.12.1
+pydantic>=2.0
+pydantic-settings>=2.0
+python-dotenv
+slowapi
+structlog
+tiktoken>=0.7.0
+uvicorn>=0.20.0

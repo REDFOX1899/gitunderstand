@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="mb-8">
+        <div class="relative w-full flex sm:flex-row flex-col justify-center sm:items-center">
+            {# Title #}
+            <h1 class="landing-page-title">
+                Prompt-friendly
+                <br>
+                codebase&nbsp;
+            </h1>
+        </div>
+        <p class="intro-text mt-8">Turn any Git repository into a simple text digest of its codebase.</p>
+        <p class="intro-text mt-0">This is useful for feeding a codebase into any LLM.</p>
+    </div>
+    {% if error_message %}
+        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+             id="error-message"
+             data-message="{{ error_message }}">{{ error_message }}</div>
+    {% endif %}
+    {% with show_examples=true %}
+        {% include 'components/ingest_form.html' %}
+    {% endwith %}
+    {% include 'components/result.html' %}
+{% endblock %}

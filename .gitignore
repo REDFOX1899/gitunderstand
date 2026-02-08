@@ -1,0 +1,49 @@
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Python
+.venv*/
+venv/
+.python-version
+__pycache__/
+*.egg-info/
+*.egg
+.ruff_cache/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build & distribution
+build/
+dist/
+*.wheel
+
+# Logs & runtime
+*.log
+logs/
+*.tmp
+tmp/
+
+# Project-specific
+history.txt
+digest.txt
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Reference codebase (keep for reference, don't deploy)
+gitingest-reference/
+
+# Claude
+.claude/

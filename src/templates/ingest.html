@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+    {% if error_message %}
+        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+             id="error-message"
+             data-message="{{ error_message }}">{{ error_message }}</div>
+    {% endif %}
+    {% with show_examples=false %}
+        {% include 'components/ingest_form.html' %}
+    {% endwith %}
+    {% include 'components/result.html' %}
+{% endblock content %}
