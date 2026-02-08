@@ -42,6 +42,9 @@ COPY --from=builder --chown=$UID:$GID /usr/local/lib/python3.13/site-packages/ /
 COPY --chown=$UID:$GID src/ ./src/
 COPY --chown=$UID:$GID static/ ./static/
 
+# Ensure Python imports from /app/src first (so templates/static resolve correctly)
+ENV PYTHONPATH=/app/src
+
 RUN set -eux; \
     chown -R appuser:appuser /app; \
     mkdir -p /tmp/gitunderstand; \
