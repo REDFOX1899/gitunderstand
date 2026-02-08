@@ -96,7 +96,7 @@ jobs:
             --min-instances 0 \
             --max-instances 10 \
             --timeout 300 \
-            --set-env-vars "^@^GCP_PROJECT_ID=${{ env.PROJECT_ID }}@USE_LOCAL_STORAGE=true@ALLOWED_HOSTS=gitunderstand.com,gitunderstand-308289525742.us-central1.run.app,localhost,127.0.0.1" \
+            --set-env-vars "^@^GCP_PROJECT_ID=${{ env.PROJECT_ID }}@USE_LOCAL_STORAGE=false@GCS_BUCKET_NAME=gitunderstand-digests@ALLOWED_HOSTS=gitunderstand.com,gitunderstand-308289525742.us-central1.run.app,localhost,127.0.0.1" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Show Cloud Run URL

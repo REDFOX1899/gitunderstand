@@ -5,11 +5,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from api.config import get_settings
 from api.middleware import limiter
@@ -19,6 +18,7 @@ from api.query_processor import process_query, process_query_streaming
 from api.shared import templates
 from core.output_formats import OutputFormat
 from core.progress import ProgressStage
+from storage.factory import get_storage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -299,8 +299,11 @@ async def api_ingest_get(
 @router.get("/api/download/file/{ingest_id}", response_model=None)
 async def download_ingest(
     ingest_id: UUID,
-) -> FileResponse | JSONResponse:  # noqa: FA100
+) -> Response | JSONResponse:  # noqa: FA100
     """Download the text file produced for an ingest ID.
+
+    Uses the configured storage backend (local filesystem or GCS) to
+    retrieve the digest content.
 
     Parameters
     ----------
@@ -309,37 +312,27 @@ async def download_ingest(
 
     Returns
     -------
-    FileResponse
+    Response
         Streamed response with media type ``text/plain``.
 
     Raises
     ------
     HTTPException
-        404 if digest directory is missing or contains no ``.txt`` file.
-        403 if there is a permission error reading the file.
+        404 if the digest does not exist in storage.
 
     """
-    tmp_base = Path(settings.local_storage_path)
-    directory = (tmp_base / str(ingest_id)).resolve()
+    storage = get_storage()
+    digest_id = str(ingest_id)
 
-    if not str(directory).startswith(str(tmp_base.resolve())):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Invalid ingest ID: {ingest_id!r}")
-
-    if not directory.is_dir():
+    if not storage.digest_exists(digest_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Digest {ingest_id!r} not found")
 
-    try:
-        first_txt_file = next(directory.glob("*.txt"))
-    except StopIteration as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No .txt file found for digest {ingest_id!r}",
-        ) from exc
+    content_bytes = storage.get_digest_bytes(digest_id)
+    if content_bytes is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No content for digest {ingest_id!r}")
 
-    try:
-        return FileResponse(path=first_txt_file, media_type="text/plain", filename=first_txt_file.name)
-    except PermissionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission denied for {first_txt_file}",
-        ) from exc
+    return Response(
+        content=content_bytes,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="digest-{ingest_id}.txt"'},
+    )

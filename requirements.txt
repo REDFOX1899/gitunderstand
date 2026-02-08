@@ -1,6 +1,7 @@
 click>=8.0.0
 fastapi[standard]>=0.109.1
 gitpython>=3.1.0
+google-cloud-storage>=2.10.0
 httpx
 jinja2
 pathspec>=0.12.1

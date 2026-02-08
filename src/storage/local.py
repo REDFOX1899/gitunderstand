@@ -147,6 +147,25 @@ class LocalStorage(DigestStorage):
             return None
         return json.loads(metadata_file.read_text(encoding="utf-8"))
 
+    def get_digest_bytes(self, digest_id: str) -> bytes | None:
+        """Retrieve the raw bytes of a digest from the local filesystem.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+
+        Returns
+        -------
+        bytes | None
+            The raw bytes of the digest content, or ``None`` if not found.
+
+        """
+        digest_file = self._digest_file(digest_id)
+        if not digest_file.exists():
+            return None
+        return digest_file.read_bytes()
+
     def digest_exists(self, digest_id: str) -> bool:
         """Check if a digest exists on the local filesystem.
 

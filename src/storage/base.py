@@ -50,6 +50,40 @@ class DigestStorage(ABC):
         """
 
     @abstractmethod
+    def get_metadata(self, digest_id: str) -> dict[str, Any] | None:
+        """Retrieve metadata for a digest.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The metadata dictionary, or ``None`` if not found.
+
+        """
+
+    @abstractmethod
+    def get_digest_bytes(self, digest_id: str) -> bytes | None:
+        """Retrieve the raw bytes of a digest.
+
+        Useful for streaming downloads where text decoding is not needed.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+
+        Returns
+        -------
+        bytes | None
+            The raw bytes of the digest content, or ``None`` if not found.
+
+        """
+
+    @abstractmethod
     def digest_exists(self, digest_id: str) -> bool:
         """Check if a digest exists in storage.
 

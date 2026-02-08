@@ -16,7 +16,7 @@ from core.output_formats import OutputFormat
 from core.parser import parse_remote_repo
 from core.utils.git_utils import validate_github_token
 from core.utils.pattern_utils import process_patterns
-from storage.local import LocalStorage
+from storage.factory import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def _cleanup_repository(clone_config: CloneConfig) -> None:
         logger.exception("Could not delete repository at %s", clone_config.local_path)
 
 
-def _store_digest_locally(
+def _store_digest(
     query: IngestionQuery,
     clone_config: CloneConfig,
     digest_content: str,
@@ -48,7 +48,10 @@ def _store_digest_locally(
     tree: str,
     content: str,
 ) -> str:
-    """Store digest content to local storage.
+    """Store digest content using the configured storage backend.
+
+    Uses the storage factory to select either local filesystem or GCS
+    based on application settings.
 
     Parameters
     ----------
@@ -71,7 +74,7 @@ def _store_digest_locally(
         The download URL for the stored digest.
 
     """
-    storage = LocalStorage(base_path=settings.local_storage_path)
+    storage = get_storage()
     digest_id = str(query.id)
 
     storage.store_digest(
@@ -149,7 +152,7 @@ async def process_query(
     try:
         summary, tree, content, token_counts = ingest_query(query)
         digest_content = tree + "\n" + content
-        digest_url = _store_digest_locally(query, clone_config, digest_content, summary, tree, content)
+        digest_url = _store_digest(query, clone_config, digest_content, summary, tree, content)
     except Exception as exc:
         logger.error(
             "Query processing failed for %s: %s",
@@ -273,7 +276,7 @@ async def process_query_streaming(
             reporter.report(ProgressStage.STORING, {"message": "Saving digest..."})
 
         digest_content = tree + "\n" + content
-        digest_url = _store_digest_locally(query, clone_config, digest_content, summary, tree, content)
+        digest_url = _store_digest(query, clone_config, digest_content, summary, tree, content)
     except Exception as exc:
         logger.error("Query processing failed for %s: %s", query.url, exc)
         if reporter:
