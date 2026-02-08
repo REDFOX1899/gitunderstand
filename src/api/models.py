@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field, field_validator
 
 from api.config import get_settings
+from core.output_formats import OutputFormat
 
 _settings = get_settings()
 
@@ -33,6 +34,8 @@ class IngestRequest(BaseModel):
         Glob/regex pattern string for file filtering.
     token : str | None
         GitHub personal access token (PAT) for accessing private repositories.
+    output_format : OutputFormat
+        Desired output format (text, json, markdown, xml).
 
     """
 
@@ -49,6 +52,10 @@ class IngestRequest(BaseModel):
     )
     pattern: str = Field(default="", description="Glob/regex pattern for file filtering")
     token: str | None = Field(default=None, description="GitHub PAT for private repositories")
+    output_format: OutputFormat = Field(
+        default=OutputFormat.TEXT,
+        description="Output format (text, json, markdown, xml)",
+    )
 
     @field_validator("input_text")
     @classmethod
@@ -92,6 +99,10 @@ class IngestSuccessResponse(BaseModel):
         The pattern type used for filtering.
     pattern : str
         The pattern used for filtering.
+    token_counts : dict[str, int]
+        Token counts per LLM model (e.g. GPT-4o, Claude, Gemini, Llama 3).
+    output_format : str
+        The output format used.
 
     """
 
@@ -104,6 +115,8 @@ class IngestSuccessResponse(BaseModel):
     default_max_file_size: int = Field(..., description="File size slider position used")
     pattern_type: str = Field(..., description="Pattern type used")
     pattern: str = Field(..., description="Pattern used")
+    token_counts: dict[str, int] = Field(default_factory=dict, description="Token counts per LLM model")
+    output_format: str = Field(default="text", description="Output format used")
 
 
 class IngestErrorResponse(BaseModel):

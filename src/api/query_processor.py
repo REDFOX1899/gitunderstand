@@ -11,6 +11,7 @@ from api.config import get_settings
 from api.models import IngestErrorResponse, IngestResponse, IngestSuccessResponse, PatternType
 from core.clone import clone_repo
 from core.ingestion import ingest_query
+from core.output_formats import OutputFormat
 from core.parser import parse_remote_repo
 from core.utils.git_utils import validate_github_token
 from core.utils.pattern_utils import process_patterns
@@ -93,6 +94,7 @@ async def process_query(
     pattern_type: PatternType,
     pattern: str,
     token: str | None = None,
+    output_format: OutputFormat = OutputFormat.TEXT,
 ) -> IngestResponse:
     """Process a query by parsing input, cloning a repository, and generating a summary.
 
@@ -111,6 +113,8 @@ async def process_query(
         Pattern to include or exclude in the query, depending on the pattern type.
     token : str | None
         GitHub personal access token (PAT) for accessing private repositories.
+    output_format : OutputFormat
+        Desired output format (text, json, markdown, xml).
 
     Returns
     -------
@@ -141,7 +145,7 @@ async def process_query(
     short_repo_url = f"{query.user_name}/{query.repo_name}"
 
     try:
-        summary, tree, content = ingest_query(query)
+        summary, tree, content, token_counts = ingest_query(query)
         digest_content = tree + "\n" + content
         digest_url = _store_digest_locally(query, clone_config, digest_content, summary, tree, content)
     except Exception as exc:
@@ -173,4 +177,6 @@ async def process_query(
         default_max_file_size=max_file_size,
         pattern_type=pattern_type,
         pattern=pattern,
+        token_counts=token_counts,
+        output_format=output_format.value,
     )

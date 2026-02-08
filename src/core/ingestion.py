@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def ingest_query(query: IngestionQuery) -> tuple[str, str, str]:
+def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
     """Run the ingestion process for a parsed query.
 
     This is the main entry point for analyzing a codebase directory or single file. It processes the query
@@ -32,8 +32,8 @@ def ingest_query(query: IngestionQuery) -> tuple[str, str, str]:
 
     Returns
     -------
-    tuple[str, str, str]
-        A tuple containing the summary, directory structure, and file contents.
+    tuple[str, str, str, dict[str, int]]
+        A tuple containing the summary, directory structure, file contents, and token counts per model.
 
     Raises
     ------

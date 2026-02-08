@@ -30,7 +30,7 @@
             <input type="hidden" name="pattern" value="">
             <!-- Controls row: pattern selector, file size slider, PAT checkbox with PAT field below -->
             <div id="controlsRow"
-                 class="mt-7 grid gap-6 grid-cols-1 sm:grid-cols-[3fr_2fr] md:gap-x-10 lg:grid-cols-[5fr_4fr_4fr] lg:gap-y-0">
+                 class="mt-7 grid gap-6 grid-cols-1 sm:grid-cols-[3fr_2fr] md:gap-x-10 lg:grid-cols-[5fr_3fr_3fr_3fr] lg:gap-y-0">
                 <!-- Pattern selector -->
                 <div class="w-full relative self-center">
                     <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0 z-10"></div>
@@ -80,6 +80,35 @@
                            value="{{ default_max_file_size }}"
                            class="w-full h-3 bg-[#FAFAFA] bg-no-repeat bg-[length:50%_100%] bg-[#ebdbb7] appearance-none border-[3px] border-gray-900 rounded-sm focus:outline-none bg-gradient-to-r from-[#FE4A60] to-[#FE4A60] [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-solid [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-gray-900 [&::-webkit-slider-thumb]:shadow-[3px_3px_0_#000]">
                     <input type="hidden" id="max_file_size_kb" name="max_file_size" value="">
+                </div>
+                <!-- Output format selector -->
+                <div class="w-full self-center">
+                    <label for="output_format" class="block text-gray-700 mb-1">
+                        Output format
+                    </label>
+                    <div class="relative w-full">
+                        <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0 z-10"></div>
+                        <div class="relative z-20">
+                            <select id="output_format"
+                                    name="output_format"
+                                    class="w-full py-2 px-3 bg-[#E8F0FE] border-[3px] border-gray-900 rounded appearance-none focus:outline-none cursor-pointer">
+                                <option value="text" selected>Text</option>
+                                <option value="json">JSON</option>
+                                <option value="markdown">Markdown</option>
+                                <option value="xml">XML</option>
+                            </select>
+                            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                                 xmlns="http://www.w3.org/2000/svg"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="2"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
                 <!-- PAT checkbox with PAT field below -->
                 <div class="flex flex-col items-start w-full sm:col-span-2 lg:col-span-1 lg:row-span-2 lg:pt-3.5">

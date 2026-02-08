@@ -27,6 +27,15 @@
                                       class="w-full h-[160px] p-4 bg-[#fff4da] border-[3px] border-gray-900 rounded font-mono text-sm resize-none focus:outline-none relative z-10"
                                       readonly></textarea>
                         </div>
+                        <!-- Token Counts Widget -->
+                        <div id="token-counts-widget" class="mt-4 hidden">
+                            <h4 class="text-sm font-bold text-gray-700 mb-2">Token Estimates by Model</h4>
+                            <div class="relative">
+                                <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                                <div id="token-counts-grid" class="relative z-10 grid grid-cols-2 gap-2 p-3 bg-[#fff4da] border-[3px] border-gray-900 rounded text-sm font-mono">
+                                </div>
+                            </div>
+                        </div>
                         <div class="relative mt-4 inline-block group ml-4">
                             <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
                             <button onclick="copyFullDigest()"

@@ -140,11 +140,14 @@ function collectFormData(form) {
     const patternType = document.getElementById('pattern_type');
     const pattern = document.getElementById('pattern');
 
+    const outputFormat = document.getElementById('output_format');
+
     if (inputText) { json_data.input_text = inputText.value; }
     if (token) { json_data.token = token.value; }
     if (hiddenInput) { json_data.max_file_size = hiddenInput.value; }
     if (patternType) { json_data.pattern_type = patternType.value; }
     if (pattern) { json_data.pattern = pattern.value; }
+    if (outputFormat) { json_data.output_format = outputFormat.value; }
 
     return json_data;
 }
@@ -182,6 +185,41 @@ function setButtonLoadingState(submitButton, isLoading) {
 // Successful response handler
 // ---------------------------------------------------------------------------
 
+function formatTokenCount(count) {
+    if (count >= 1000000) {
+        return `${(count / 1000000).toFixed(1)}M`;
+    }
+    if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}k`;
+    }
+    return String(count);
+}
+
+function renderTokenCounts(tokenCounts) {
+    const widget = document.getElementById('token-counts-widget');
+    const grid = document.getElementById('token-counts-grid');
+    if (!widget || !grid || !tokenCounts || Object.keys(tokenCounts).length === 0) {
+        if (widget) { widget.classList.add('hidden'); }
+        return;
+    }
+
+    grid.innerHTML = '';
+    for (const [model, count] of Object.entries(tokenCounts)) {
+        const label = document.createElement('span');
+        label.className = 'text-gray-600';
+        label.textContent = model;
+
+        const value = document.createElement('span');
+        value.className = 'font-bold text-gray-900 text-right';
+        value.textContent = formatTokenCount(count);
+
+        grid.appendChild(label);
+        grid.appendChild(value);
+    }
+
+    widget.classList.remove('hidden');
+}
+
 function handleSuccessfulResponse(data) {
     showResults();
 
@@ -192,6 +230,9 @@ function handleSuccessfulResponse(data) {
     document.getElementById('result-summary').value = data.summary || '';
     document.getElementById('directory-structure-content').value = data.tree || '';
     document.getElementById('result-content').value = data.content || '';
+
+    // Render token counts widget
+    renderTokenCounts(data.token_counts);
 
     // Populate directory structure lines as clickable <pre> elements
     const dirPre = document.getElementById('directory-structure-pre');

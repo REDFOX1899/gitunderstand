@@ -14,6 +14,7 @@ from api.middleware import limiter
 from api.models import IngestErrorResponse, IngestRequest, IngestSuccessResponse, PatternType
 from api.query_processor import process_query
 from api.shared import templates
+from core.output_formats import OutputFormat
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -36,6 +37,7 @@ async def _perform_ingestion(
     pattern_type: str,
     pattern: str,
     token: str | None,
+    output_format: OutputFormat = OutputFormat.TEXT,
 ) -> JSONResponse:
     """Run ``process_query`` and wrap the result in a JSONResponse.
 
@@ -53,6 +55,8 @@ async def _perform_ingestion(
         Pattern string.
     token : str | None
         GitHub PAT for private repositories.
+    output_format : OutputFormat
+        Desired output format (text, json, markdown, xml).
 
     Returns
     -------
@@ -69,6 +73,7 @@ async def _perform_ingestion(
             pattern_type=pt,
             pattern=pattern,
             token=token,
+            output_format=output_format,
         )
 
         if isinstance(result, IngestErrorResponse):
@@ -149,6 +154,7 @@ async def api_ingest(
         pattern_type=ingest_request.pattern_type.value,
         pattern=ingest_request.pattern,
         token=ingest_request.token,
+        output_format=ingest_request.output_format,
     )
 
 

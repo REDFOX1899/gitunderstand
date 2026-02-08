@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
-import ssl
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import requests.exceptions
-import tiktoken
-
 from core.schemas import FileSystemNode, FileSystemNodeType
+from core.token_counting import estimate_tokens, estimates_to_dict, format_token_count
 
 if TYPE_CHECKING:
     from core.schemas import IngestionQuery
@@ -19,14 +16,9 @@ if TYPE_CHECKING:
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
 
-_TOKEN_THRESHOLDS: list[tuple[int, str]] = [
-    (1_000_000, "M"),
-    (1_000, "k"),
-]
 
-
-def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, str]:
-    """Generate a summary, directory structure, and file contents for a given file system node.
+def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
+    """Generate a summary, directory structure, file contents, and token counts for a file system node.
 
     If the node represents a directory, the function will recursively process its contents.
 
@@ -39,8 +31,8 @@ def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, 
 
     Returns
     -------
-    tuple[str, str, str]
-        A tuple containing the summary, directory structure, and file contents.
+    tuple[str, str, str, dict[str, int]]
+        A tuple containing the summary, directory structure, file contents, and token counts per model.
 
     """
     is_single_file = node.type == FileSystemNodeType.FILE
@@ -56,11 +48,21 @@ def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, 
 
     content = _gather_file_contents(node)
 
-    token_estimate = _format_token_count(tree + content)
-    if token_estimate:
-        summary += f"\nEstimated tokens: {token_estimate}"
+    # Multi-LLM token counting
+    full_text = tree + content
+    token_counts: dict[str, int] = {}
+    try:
+        estimates = estimate_tokens(full_text)
+        token_counts = estimates_to_dict(estimates)
+    except Exception:
+        logger.warning("Failed to estimate token counts")
 
-    return summary, tree, content
+    if token_counts:
+        summary += "\nEstimated tokens:\n"
+        for model_name, count in token_counts.items():
+            summary += f"  {model_name}: {format_token_count(count)}\n"
+
+    return summary, tree, content, token_counts
 
 
 def _create_summary_prefix(query: IngestionQuery, *, single_file: bool = False) -> str:
@@ -177,35 +179,3 @@ def _create_tree_structure(
         for i, child in enumerate(node.children):
             tree_str += _create_tree_structure(query, node=child, prefix=prefix, is_last=i == len(node.children) - 1)
     return tree_str
-
-
-def _format_token_count(text: str) -> str | None:
-    """Return a human-readable token-count string (e.g. 1.2k, 1.2 M).
-
-    Parameters
-    ----------
-    text : str
-        The text string for which the token count is to be estimated.
-
-    Returns
-    -------
-    str | None
-        The formatted number of tokens as a string (e.g., ``"1.2k"``, ``"1.2M"``), or ``None`` if an error occurs.
-
-    """
-    try:
-        encoding = tiktoken.get_encoding("o200k_base")  # gpt-4o, gpt-4o-mini
-        total_tokens = len(encoding.encode(text, disallowed_special=()))
-    except (ValueError, UnicodeEncodeError) as exc:
-        logger.warning("Failed to estimate token size", extra={"error": str(exc)})
-        return None
-    except (requests.exceptions.RequestException, ssl.SSLError) as exc:
-        # If network errors, skip token count estimation instead of erroring out
-        logger.warning("Failed to download tiktoken model", extra={"error": str(exc)})
-        return None
-
-    for threshold, suffix in _TOKEN_THRESHOLDS:
-        if total_tokens >= threshold:
-            return f"{total_tokens / threshold:.1f}{suffix}"
-
-    return str(total_tokens)

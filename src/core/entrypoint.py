@@ -139,7 +139,7 @@ async def ingest_async(
             _apply_gitignores(query)
 
         logger.info("Processing files and generating output")
-        summary, tree, content = ingest_query(query)
+        summary, tree, content, _token_counts = ingest_query(query)
 
         if output:
             logger.debug("Writing output to file", extra={"output_path": output})
