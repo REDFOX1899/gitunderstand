@@ -44,11 +44,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ]; then
+            echo "::error::GCP_WORKLOAD_IDENTITY_PROVIDER secret is not set or empty"
+            exit 1
+          fi
+          if [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT secret is not set or empty"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
       - name: Authenticate to GCP
+        id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -81,12 +95,14 @@ jobs:
             --min-instances 0 \
             --max-instances 10 \
             --timeout 300 \
-            --set-env-vars "GCP_PROJECT_ID=${{ env.PROJECT_ID }},USE_LOCAL_STORAGE=true" \
+            --set-env-vars "GCP_PROJECT_ID=${{ env.PROJECT_ID }},USE_LOCAL_STORAGE=true,ALLOWED_HOSTS=gitunderstand.com,localhost,127.0.0.1" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Show Cloud Run URL
         run: |
-          gcloud run services describe ${{ env.SERVICE }} \
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --format "value(status.url)"
+            --format "value(status.url)")
+          echo "Cloud Run URL: $URL"
+          echo "::notice::Deployed to $URL"
