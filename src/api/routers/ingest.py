@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from api.config import get_settings
 from api.middleware import limiter
 from api.models import IngestErrorResponse, IngestRequest, IngestSuccessResponse, PatternType
 from api.query_processor import process_query
+from api.shared import templates
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -82,6 +83,40 @@ async def _perform_ingestion(
     except Exception as exc:
         error_response = IngestErrorResponse(error=f"Internal server error: {exc!s}")
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=error_response.model_dump())
+
+
+@router.get("/{user}/{repository}", response_class=HTMLResponse, include_in_schema=False)
+async def ingest_page(
+    request: Request,
+    user: str,
+    repository: str,
+) -> HTMLResponse:
+    """Render the ingest page with a GitHub repo URL pre-filled.
+
+    The frontend JS auto-submits the form on page load when a URL is present.
+
+    Parameters
+    ----------
+    request : Request
+        The incoming HTTP request.
+    user : str
+        GitHub username or organization.
+    repository : str
+        GitHub repository name.
+
+    Returns
+    -------
+    HTMLResponse
+        The rendered ingest page.
+
+    """
+    repo_url = f"https://github.com/{user}/{repository}"
+    context = {
+        "request": request,
+        "repo_url": repo_url,
+        "default_max_file_size": settings.default_file_size_kb,
+    }
+    return templates.TemplateResponse("ingest.html", context)
 
 
 @router.post("/api/ingest", responses=COMMON_INGEST_RESPONSES)
