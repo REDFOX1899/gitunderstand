@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from api.config import get_settings
 from api.middleware import limiter
 from api.models import IngestErrorResponse, IngestRequest, IngestSuccessResponse, PatternType
-from api.query_processor import process_query
+from api.progress import QueueReporter, format_sse_event
+from api.query_processor import process_query, process_query_streaming
 from api.shared import templates
 from core.output_formats import OutputFormat
+from core.progress import ProgressStage
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
     from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -155,6 +160,93 @@ async def api_ingest(
         pattern=ingest_request.pattern,
         token=ingest_request.token,
         output_format=ingest_request.output_format,
+    )
+
+
+@router.post("/api/ingest/stream")
+@limiter.limit("10/minute")
+async def api_ingest_stream(
+    request: Request,
+    ingest_request: IngestRequest,
+) -> StreamingResponse:
+    """Stream ingestion progress as Server-Sent Events.
+
+    Returns a ``text/event-stream`` response that emits progress events
+    during repository cloning, file analysis, and output generation.
+    The final event of type ``complete`` contains the full ingestion result.
+
+    Parameters
+    ----------
+    request : Request
+        The incoming HTTP request (used by rate limiter).
+    ingest_request : IngestRequest
+        Pydantic model containing ingestion parameters.
+
+    Returns
+    -------
+    StreamingResponse
+        SSE stream with progress events.
+
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        reporter = QueueReporter(queue, loop)
+
+        try:
+            pt = PatternType(ingest_request.pattern_type.value)
+        except ValueError:
+            yield format_sse_event({
+                "type": ProgressStage.ERROR.value,
+                "payload": {"error": f"Invalid pattern_type: {ingest_request.pattern_type}"},
+            })
+            return
+
+        task = asyncio.create_task(
+            process_query_streaming(
+                input_text=ingest_request.input_text,
+                max_file_size=ingest_request.max_file_size,
+                pattern_type=pt,
+                pattern=ingest_request.pattern,
+                token=ingest_request.token,
+                output_format=ingest_request.output_format,
+                reporter=reporter,
+            )
+        )
+
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.5)
+                    yield format_sse_event(event)
+
+                    if event.get("type") in (ProgressStage.COMPLETE.value, ProgressStage.ERROR.value):
+                        break
+                except TimeoutError:
+                    if task.done():
+                        # Drain any remaining events
+                        while not queue.empty():
+                            event = queue.get_nowait()
+                            yield format_sse_event(event)
+                        break
+        except asyncio.CancelledError:
+            task.cancel()
+            raise
+        finally:
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):  # noqa: BLE001
+                    await task
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

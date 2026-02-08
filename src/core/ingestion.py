@@ -12,13 +12,17 @@ from core.schemas import FileSystemNode, FileSystemNodeType, FileSystemStats
 from core.utils.ingestion_utils import _should_exclude, _should_include
 
 if TYPE_CHECKING:
+    from core.progress import ProgressReporter
     from core.schemas import IngestionQuery
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
 
 
-def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
+def ingest_query(
+    query: IngestionQuery,
+    reporter: ProgressReporter | None = None,
+) -> tuple[str, str, str, dict[str, int]]:
     """Run the ingestion process for a parsed query.
 
     This is the main entry point for analyzing a codebase directory or single file. It processes the query
@@ -29,6 +33,9 @@ def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
     ----------
     query : IngestionQuery
         The parsed query object containing information about the repository and query parameters.
+    reporter : ProgressReporter | None
+        Optional progress reporter for SSE streaming. When provided, emits
+        ``analyzing`` and ``formatting`` events during processing.
 
     Returns
     -------
@@ -100,6 +107,11 @@ def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
 
     logger.info("Processing directory", extra={"directory_path": str(path)})
 
+    if reporter:
+        from core.progress import ProgressStage
+
+        reporter.report(ProgressStage.ANALYZING, {"message": "Analyzing files..."})
+
     root_node = FileSystemNode(
         name=path.name,
         type=FileSystemNodeType.DIRECTORY,
@@ -109,7 +121,7 @@ def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
 
     stats = FileSystemStats()
 
-    _process_node(node=root_node, query=query, stats=stats)
+    _process_node(node=root_node, query=query, stats=stats, reporter=reporter)
 
     logger.info(
         "Directory processing completed",
@@ -122,10 +134,20 @@ def ingest_query(query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
         },
     )
 
+    if reporter:
+        from core.progress import ProgressStage
+
+        reporter.report(ProgressStage.FORMATTING, {"message": "Building output..."})
+
     return format_node(root_node, query=query)
 
 
-def _process_node(node: FileSystemNode, query: IngestionQuery, stats: FileSystemStats) -> None:
+def _process_node(
+    node: FileSystemNode,
+    query: IngestionQuery,
+    stats: FileSystemStats,
+    reporter: ProgressReporter | None = None,
+) -> None:
     """Process a file or directory item within a directory.
 
     This function handles each file or directory item, checking if it should be included or excluded based on the
@@ -139,6 +161,8 @@ def _process_node(node: FileSystemNode, query: IngestionQuery, stats: FileSystem
         The parsed query object containing information about the repository and query parameters.
     stats : FileSystemStats
         Statistics tracking object for the total file count and size.
+    reporter : ProgressReporter | None
+        Optional progress reporter for SSE streaming.
 
     """
     if limit_exceeded(stats, depth=node.depth):
@@ -165,6 +189,19 @@ def _process_node(node: FileSystemNode, query: IngestionQuery, stats: FileSystem
                 )
                 continue
             _process_file(path=sub_path, parent_node=node, stats=stats, local_path=query.local_path)
+
+            # Report progress every 10 files
+            if reporter and stats.total_files % 10 == 0:
+                from core.progress import ProgressStage
+
+                reporter.report(
+                    ProgressStage.ANALYZING,
+                    {
+                        "message": f"Analyzing files... ({stats.total_files} processed)",
+                        "files_processed": stats.total_files,
+                        "current_file": str(sub_path.relative_to(query.local_path)),
+                    },
+                )
         elif sub_path.is_dir():
             child_directory_node = FileSystemNode(
                 name=sub_path.name,
@@ -174,7 +211,7 @@ def _process_node(node: FileSystemNode, query: IngestionQuery, stats: FileSystem
                 depth=node.depth + 1,
             )
 
-            _process_node(node=child_directory_node, query=query, stats=stats)
+            _process_node(node=child_directory_node, query=query, stats=stats, reporter=reporter)
 
             if not child_directory_node.children:
                 continue

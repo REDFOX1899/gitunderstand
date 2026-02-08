@@ -112,6 +112,14 @@ function showLoading() {
     document.getElementById('results-loading').style.display = 'block';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('results-error').style.display = 'none';
+
+    // Reset progress bar
+    const progressBar = document.getElementById('progress-bar-fill');
+    const progressText = document.getElementById('progress-stage-text');
+    const progressDetail = document.getElementById('progress-detail-text');
+    if (progressBar) { progressBar.style.width = '0%'; }
+    if (progressText) { progressText.textContent = 'Preparing...'; }
+    if (progressDetail) { progressDetail.textContent = 'Initializing...'; }
 }
 
 function showResults() {
@@ -257,6 +265,76 @@ function handleSuccessfulResponse(data) {
 // Form submission
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// SSE Progress UI
+// ---------------------------------------------------------------------------
+
+const PROGRESS_STAGES = {
+    parsing:    { label: 'Parsing URL',        pct: 5 },
+    cloning:    { label: 'Cloning repository',  pct: 25 },
+    analyzing:  { label: 'Analyzing files',     pct: 60 },
+    formatting: { label: 'Building output',     pct: 85 },
+    storing:    { label: 'Saving digest',       pct: 95 },
+};
+
+function updateProgress(stage, message, filesProcessed) {
+    const loadingDiv = document.getElementById('results-loading');
+    if (!loadingDiv || loadingDiv.style.display === 'none') { return; }
+
+    const stageInfo = PROGRESS_STAGES[stage];
+    if (!stageInfo) { return; }
+
+    const progressBar = document.getElementById('progress-bar-fill');
+    const progressText = document.getElementById('progress-stage-text');
+    const progressDetail = document.getElementById('progress-detail-text');
+
+    if (progressBar) { progressBar.style.width = stageInfo.pct + '%'; }
+    if (progressText) { progressText.textContent = stageInfo.label; }
+    if (progressDetail) {
+        if (filesProcessed) {
+            progressDetail.textContent = filesProcessed + ' files processed';
+        } else {
+            progressDetail.textContent = message || '';
+        }
+    }
+}
+
+function handleSSEEvent(event, submitButton) {
+    const { type, payload } = event;
+
+    switch (type) {
+        case 'parsing':
+            updateProgress('parsing', payload.message || 'Parsing...');
+            break;
+        case 'cloning':
+            updateProgress('cloning', payload.message || 'Cloning repository...');
+            break;
+        case 'analyzing':
+            updateProgress('analyzing', payload.message || 'Analyzing files...', payload.files_processed || 0);
+            break;
+        case 'formatting':
+            updateProgress('formatting', payload.message || 'Building output...');
+            break;
+        case 'storing':
+            updateProgress('storing', payload.message || 'Saving digest...');
+            break;
+        case 'complete':
+            setButtonLoadingState(submitButton, false);
+            handleSuccessfulResponse(payload);
+            break;
+        case 'error':
+            setButtonLoadingState(submitButton, false);
+            showError(`<div class='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700'>${payload.error || 'An unknown error occurred.'}</div>`);
+            break;
+        default:
+            console.warn('Unknown SSE event type:', type);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Form submission (SSE streaming)
+// ---------------------------------------------------------------------------
+
 function handleSubmit(event, showLoadingSpinner) {
     if (showLoadingSpinner === undefined) { showLoadingSpinner = false; }
     event.preventDefault();
@@ -284,21 +362,21 @@ function handleSubmit(event, showLoadingSpinner) {
         setButtonLoadingState(submitButton, true);
     }
 
-    fetch('/api/ingest', {
+    fetch('/api/ingest/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(json_data)
     })
         .then(async (response) => {
-            let data;
-            try {
-                data = await response.json();
-            } catch {
-                data = {};
-            }
-            setButtonLoadingState(submitButton, false);
-
             if (!response.ok) {
+                // Non-streaming error (validation, rate limit, etc.)
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
+                setButtonLoadingState(submitButton, false);
                 if (Array.isArray(data.detail)) {
                     const details = data.detail.map((d) => `<li>${d.msg || JSON.stringify(d)}</li>`).join('');
                     showError(`<div class='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700'><b>Error(s):</b><ul>${details}</ul></div>`);
@@ -308,12 +386,37 @@ function handleSubmit(event, showLoadingSpinner) {
                 return;
             }
 
-            if (data.error) {
-                showError(`<div class='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700'>${data.error}</div>`);
-                return;
-            }
+            // Read the SSE stream via ReadableStream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-            handleSuccessfulResponse(data);
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) { break; }
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // SSE events are separated by double newlines
+                const events = buffer.split('\n\n');
+                buffer = events.pop(); // Keep last potentially incomplete chunk
+
+                for (const eventStr of events) {
+                    if (!eventStr.trim()) { continue; }
+
+                    const lines = eventStr.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const sseEvent = JSON.parse(line.slice(6));
+                                handleSSEEvent(sseEvent, submitButton);
+                            } catch (e) {
+                                console.error('Failed to parse SSE event:', e, line);
+                            }
+                        }
+                    }
+                }
+            }
         })
         .catch((error) => {
             setButtonLoadingState(submitButton, false);
@@ -457,6 +560,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Make functions available globally for inline event handlers
 window.handleSubmit = handleSubmit;
+window.handleSSEEvent = handleSSEEvent;
+window.updateProgress = updateProgress;
 window.toggleFile = toggleFile;
 window.copyText = copyText;
 window.copyFullDigest = copyFullDigest;
