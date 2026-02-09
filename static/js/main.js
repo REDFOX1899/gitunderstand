@@ -1285,11 +1285,34 @@ function _appendChatError(message) {
     const container = document.getElementById('chat-messages');
     if (!container) { return; }
 
+    // Detect rate limit errors and show a friendly message
+    const isRateLimit = /rate.limit|429|too many requests|wait.*minute/i.test(message);
+    const friendlyMsg = isRateLimit
+        ? 'Rate limit reached — the AI is temporarily busy. Please wait a moment and try again.'
+        : message;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'chat-msg-error flex gap-3 animate-fade-in';
-    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg bg-red-100 border-[2px] border-red-400 flex items-center justify-center flex-shrink-0 text-xs font-bold text-red-600">!</div>'
-        + '<div class="bg-red-50 border-[2px] border-red-300 rounded-lg p-3 max-w-[80%]">'
-        + '<p class="text-sm text-red-700">' + _escapeHtml(message) + '</p></div>';
+
+    const retryBtn = isRateLimit
+        ? '<button onclick="this.closest(\'.chat-msg-error\').remove()" '
+          + 'class="mt-2 text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-300 '
+          + 'rounded-md px-3 py-1 hover:bg-amber-200 transition-colors cursor-pointer">'
+          + 'Dismiss</button>'
+        : '';
+
+    const bgColor = isRateLimit ? 'bg-amber-50' : 'bg-red-50';
+    const borderColor = isRateLimit ? 'border-amber-300' : 'border-red-300';
+    const textColor = isRateLimit ? 'text-amber-800' : 'text-red-700';
+    const iconBg = isRateLimit ? 'bg-amber-100' : 'bg-red-100';
+    const iconBorder = isRateLimit ? 'border-amber-400' : 'border-red-400';
+    const iconColor = isRateLimit ? 'text-amber-600' : 'text-red-600';
+    const icon = isRateLimit ? '⏳' : '!';
+
+    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg ' + iconBg + ' border-[2px] ' + iconBorder + ' flex items-center justify-center flex-shrink-0 text-xs font-bold ' + iconColor + '">' + icon + '</div>'
+        + '<div class="' + bgColor + ' border-[2px] ' + borderColor + ' rounded-lg p-3 max-w-[80%]">'
+        + '<p class="text-sm ' + textColor + '">' + _escapeHtml(friendlyMsg) + '</p>'
+        + retryBtn + '</div>';
 
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
@@ -1332,7 +1355,11 @@ function _readSSEStream(url, body, onEvent, onError) {
             if (!response.ok) {
                 let data;
                 try { data = await response.json(); } catch { data = {}; }
-                onEvent({ type: 'error', payload: { message: data.error || data.detail || 'Request failed' } });
+                let errMsg = data.error || data.detail || 'Request failed';
+                if (response.status === 429) {
+                    errMsg = 'Rate limit exceeded. Please wait a moment before trying again.';
+                }
+                onEvent({ type: 'error', payload: { message: errMsg } });
                 return;
             }
 

@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from enum import StrEnum
 
 import anthropic
+from anthropic import RateLimitError as _RateLimitError
 
 logger = logging.getLogger(__name__)
+
+# Retry configuration for rate-limit (429) errors
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 2  # seconds
 
 # Maximum characters to send to Claude (leave room for prompt within 200K context)
 MAX_CONTENT_CHARS = 1_500_000
 
-# Maximum characters for chat context (smaller to leave room for conversation history)
-MAX_CHAT_CONTEXT_CHARS = 500_000
+# Maximum characters for chat context (smaller to leave room for conversation history
+# and to reduce token usage for rate-limit-constrained plans)
+MAX_CHAT_CONTEXT_CHARS = 200_000
 
 # Default model for AI generation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
@@ -133,22 +140,37 @@ async def generate_summary(
         f"## File Contents\n{content}"
     )
 
-    try:
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
-            model=DEFAULT_MODEL,
-            max_tokens=8192,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        result = response.content[0].text
-    except Exception as exc:
-        logger.exception("Claude API call failed for summary_type=%s", summary_type.value)
-        msg = f"AI summary generation failed: {exc}"
-        raise RuntimeError(msg) from exc
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    last_exc: Exception | None = None
 
-    logger.info("Generated %s summary (%d chars)", summary_type.value, len(result))
-    return result
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = await client.messages.create(
+                model=DEFAULT_MODEL,
+                max_tokens=8192,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+            result = response.content[0].text
+            logger.info("Generated %s summary (%d chars)", summary_type.value, len(result))
+            return result
+        except _RateLimitError as exc:
+            last_exc = exc
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            logger.warning(
+                "Rate limited (attempt %d/%d) for summary_type=%s, retrying in %ds",
+                attempt + 1, MAX_RETRIES, summary_type.value, delay,
+            )
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(delay)
+        except Exception as exc:
+            logger.exception("Claude API call failed for summary_type=%s", summary_type.value)
+            msg = f"AI summary generation failed: {exc}"
+            raise RuntimeError(msg) from exc
+
+    # All retries exhausted for rate limiting
+    msg = "Rate limit exceeded. Please wait a minute before trying again."
+    raise RuntimeError(msg) from last_exc
 
 
 async def generate_chat_response(
@@ -216,19 +238,34 @@ async def generate_chat_response(
             messages.append({"role": msg_item["role"], "content": msg_item["content"]})
     messages.append({"role": "user", "content": message})
 
-    try:
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
-            model=DEFAULT_MODEL,
-            max_tokens=4096,
-            system=system_prompt,
-            messages=messages,
-        )
-        result = response.content[0].text
-    except Exception as exc:
-        logger.exception("Claude chat API call failed")
-        msg = f"AI chat failed: {exc}"
-        raise RuntimeError(msg) from exc
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    last_exc: Exception | None = None
 
-    logger.info("Generated chat response (%d chars)", len(result))
-    return result
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = await client.messages.create(
+                model=DEFAULT_MODEL,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=messages,
+            )
+            result = response.content[0].text
+            logger.info("Generated chat response (%d chars)", len(result))
+            return result
+        except _RateLimitError as exc:
+            last_exc = exc
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            logger.warning(
+                "Rate limited (attempt %d/%d) for chat, retrying in %ds",
+                attempt + 1, MAX_RETRIES, delay,
+            )
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(delay)
+        except Exception as exc:
+            logger.exception("Claude chat API call failed")
+            msg = f"AI chat failed: {exc}"
+            raise RuntimeError(msg) from exc
+
+    # All retries exhausted for rate limiting
+    msg = "Rate limit exceeded. Please wait a minute before trying again."
+    raise RuntimeError(msg) from last_exc
