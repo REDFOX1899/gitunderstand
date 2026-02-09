@@ -56,6 +56,16 @@ class IngestRequest(BaseModel):
         default=OutputFormat.TEXT,
         description="Output format (text, json, markdown, xml)",
     )
+    target_model: str | None = Field(
+        default=None,
+        description="Target LLM model for smart chunking (GPT-4o, Claude, Gemini, Llama 3)",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        ge=1000,
+        le=10_000_000,
+        description="Custom max tokens per chunk (overrides model default)",
+    )
 
     @field_validator("input_text")
     @classmethod
@@ -74,6 +84,31 @@ class IngestRequest(BaseModel):
     def validate_pattern(cls, v: str) -> str:
         """Validate ``pattern`` field."""
         return v.strip()
+
+
+class ChunkInfo(BaseModel):
+    """Metadata for a single chunk in a chunked digest.
+
+    Attributes
+    ----------
+    index : int
+        Zero-based chunk index.
+    total_chunks : int
+        Total number of chunks.
+    files : list[str]
+        File paths included in this chunk.
+    token_count : int
+        Token count for this chunk.
+    content : str
+        Full content string (manifest + tree + file contents).
+
+    """
+
+    index: int = Field(..., description="Zero-based chunk index")
+    total_chunks: int = Field(..., description="Total number of chunks")
+    files: list[str] = Field(default_factory=list, description="File paths in this chunk")
+    token_count: int = Field(default=0, description="Token count for this chunk")
+    content: str = Field(default="", description="Full chunk content")
 
 
 class IngestSuccessResponse(BaseModel):
@@ -103,6 +138,10 @@ class IngestSuccessResponse(BaseModel):
         Token counts per LLM model (e.g. GPT-4o, Claude, Gemini, Llama 3).
     output_format : str
         The output format used.
+    chunks : list[ChunkInfo] | None
+        Chunked digest content when a target model is specified.
+    target_model : str | None
+        Target model used for chunking.
 
     """
 
@@ -117,6 +156,8 @@ class IngestSuccessResponse(BaseModel):
     pattern: str = Field(..., description="Pattern used")
     token_counts: dict[str, int] = Field(default_factory=dict, description="Token counts per LLM model")
     output_format: str = Field(default="text", description="Output format used")
+    chunks: list[ChunkInfo] | None = Field(default=None, description="Chunked digest content")
+    target_model: str | None = Field(default=None, description="Target model used for chunking")
 
 
 class IngestErrorResponse(BaseModel):

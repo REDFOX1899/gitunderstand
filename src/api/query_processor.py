@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from api.config import get_settings
-from api.models import IngestErrorResponse, IngestResponse, IngestSuccessResponse, PatternType
+from api.models import ChunkInfo, IngestErrorResponse, IngestResponse, IngestSuccessResponse, PatternType
 from core.clone import clone_repo
 from core.ingestion import ingest_query
 from core.output_formats import OutputFormat
@@ -93,6 +93,46 @@ def _store_digest(
     return f"/api/download/file/{query.id}"
 
 
+def _maybe_chunk(
+    content: str,
+    tree: str,
+    summary: str,
+    target_model: str | None,
+    max_tokens: int | None,
+) -> list[ChunkInfo] | None:
+    """Run smart chunking if a target model is specified.
+
+    Returns a list of :class:`ChunkInfo` when chunking produces more than
+    one chunk, or ``None`` otherwise (single-chunk or no model set).
+    """
+    if not target_model:
+        return None
+
+    from core.chunking import chunk_content  # noqa: PLC0415
+
+    chunks = chunk_content(
+        content=content,
+        tree=tree,
+        summary=summary,
+        target_model=target_model,
+        max_tokens=max_tokens,
+    )
+
+    if len(chunks) <= 1:
+        return None
+
+    return [
+        ChunkInfo(
+            index=c.index,
+            total_chunks=c.total_chunks,
+            files=list(c.files),
+            token_count=c.token_count,
+            content=c.content,
+        )
+        for c in chunks
+    ]
+
+
 async def process_query(
     input_text: str,
     max_file_size: int,
@@ -100,6 +140,8 @@ async def process_query(
     pattern: str,
     token: str | None = None,
     output_format: OutputFormat = OutputFormat.TEXT,
+    target_model: str | None = None,
+    max_tokens: int | None = None,
 ) -> IngestResponse:
     """Process a query by parsing input, cloning a repository, and generating a summary.
 
@@ -120,6 +162,10 @@ async def process_query(
         GitHub personal access token (PAT) for accessing private repositories.
     output_format : OutputFormat
         Desired output format (text, json, markdown, xml).
+    target_model : str | None
+        Target LLM model for smart chunking.
+    max_tokens : int | None
+        Custom max tokens per chunk (overrides model default).
 
     Returns
     -------
@@ -162,6 +208,9 @@ async def process_query(
         _cleanup_repository(clone_config)
         return IngestErrorResponse(error=f"{exc!s}")
 
+    # Smart chunking (when target_model is set)
+    chunks_data = _maybe_chunk(content, tree, summary, target_model, max_tokens)
+
     if len(content) > MAX_DISPLAY_SIZE:
         content = (
             f"(Files content cropped to {int(MAX_DISPLAY_SIZE / 1_000)}k characters, "
@@ -184,6 +233,8 @@ async def process_query(
         pattern=pattern,
         token_counts=token_counts,
         output_format=output_format.value,
+        chunks=chunks_data,
+        target_model=target_model,
     )
 
 
@@ -195,6 +246,8 @@ async def process_query_streaming(
     token: str | None = None,
     output_format: OutputFormat = OutputFormat.TEXT,
     reporter: ProgressReporter | None = None,
+    target_model: str | None = None,
+    max_tokens: int | None = None,
 ) -> IngestResponse:
     """Process a query with SSE progress reporting.
 
@@ -218,6 +271,10 @@ async def process_query_streaming(
         Desired output format (text, json, markdown, xml).
     reporter : ProgressReporter | None
         Progress reporter for SSE streaming events.
+    target_model : str | None
+        Target LLM model for smart chunking.
+    max_tokens : int | None
+        Custom max tokens per chunk (overrides model default).
 
     Returns
     -------
@@ -284,6 +341,9 @@ async def process_query_streaming(
         _cleanup_repository(clone_config)
         return IngestErrorResponse(error=f"{exc!s}")
 
+    # Smart chunking (when target_model is set)
+    chunks_data = _maybe_chunk(content, tree, summary, target_model, max_tokens)
+
     if len(content) > MAX_DISPLAY_SIZE:
         content = (
             f"(Files content cropped to {int(MAX_DISPLAY_SIZE / 1_000)}k characters, "
@@ -306,6 +366,8 @@ async def process_query_streaming(
         pattern=pattern,
         token_counts=token_counts,
         output_format=output_format.value,
+        chunks=chunks_data,
+        target_model=target_model,
     )
 
     # Stage: Complete

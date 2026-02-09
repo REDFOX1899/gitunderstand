@@ -43,6 +43,8 @@ async def _perform_ingestion(
     pattern: str,
     token: str | None,
     output_format: OutputFormat = OutputFormat.TEXT,
+    target_model: str | None = None,
+    max_tokens: int | None = None,
 ) -> JSONResponse:
     """Run ``process_query`` and wrap the result in a JSONResponse.
 
@@ -62,6 +64,10 @@ async def _perform_ingestion(
         GitHub PAT for private repositories.
     output_format : OutputFormat
         Desired output format (text, json, markdown, xml).
+    target_model : str | None
+        Target LLM model for smart chunking.
+    max_tokens : int | None
+        Custom max tokens per chunk.
 
     Returns
     -------
@@ -79,6 +85,8 @@ async def _perform_ingestion(
             pattern=pattern,
             token=token,
             output_format=output_format,
+            target_model=target_model,
+            max_tokens=max_tokens,
         )
 
         if isinstance(result, IngestErrorResponse):
@@ -160,6 +168,8 @@ async def api_ingest(
         pattern=ingest_request.pattern,
         token=ingest_request.token,
         output_format=ingest_request.output_format,
+        target_model=ingest_request.target_model,
+        max_tokens=ingest_request.max_tokens,
     )
 
 
@@ -212,6 +222,8 @@ async def api_ingest_stream(
                 token=ingest_request.token,
                 output_format=ingest_request.output_format,
                 reporter=reporter,
+                target_model=ingest_request.target_model,
+                max_tokens=ingest_request.max_tokens,
             )
         )
 

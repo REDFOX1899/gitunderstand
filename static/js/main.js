@@ -157,6 +157,9 @@ function collectFormData(form) {
     if (pattern) { json_data.pattern = pattern.value; }
     if (outputFormat) { json_data.output_format = outputFormat.value; }
 
+    const targetModel = document.getElementById('target_model');
+    if (targetModel && targetModel.value) { json_data.target_model = targetModel.value; }
+
     return json_data;
 }
 
@@ -242,6 +245,13 @@ function handleSuccessfulResponse(data) {
     // Render token counts widget
     renderTokenCounts(data.token_counts);
 
+    // Handle smart chunking
+    if (data.chunks && data.chunks.length > 1) {
+        renderChunkNavigation(data.chunks, data.target_model);
+    } else {
+        hideChunkNavigation();
+    }
+
     // Populate directory structure lines as clickable <pre> elements
     const dirPre = document.getElementById('directory-structure-pre');
 
@@ -259,6 +269,111 @@ function handleSuccessfulResponse(data) {
 
     // Scroll to results
     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------------------------------------------------------------------------
+// Smart Chunking UI
+// ---------------------------------------------------------------------------
+
+// Store current chunks data globally for copy/navigation
+window.currentChunks = null;
+window.currentChunkIndex = 0;
+
+function renderChunkNavigation(chunks, targetModel) {
+    window.currentChunks = chunks;
+    window.currentChunkIndex = 0;
+
+    const nav = document.getElementById('chunk-navigation');
+    const tabs = document.getElementById('chunk-tabs');
+    const info = document.getElementById('chunk-info');
+    const model = document.getElementById('chunk-model');
+    const copyChunkBtn = document.getElementById('copy-chunk-btn');
+
+    if (!nav || !tabs) { return; }
+
+    nav.style.display = 'block';
+    if (copyChunkBtn) { copyChunkBtn.style.display = 'block'; }
+
+    if (model) { model.textContent = targetModel ? ('Chunked for ' + targetModel) : ''; }
+
+    // Build tab buttons
+    tabs.innerHTML = '';
+    chunks.forEach((chunk, idx) => {
+        const btn = document.createElement('button');
+        btn.className = idx === 0
+            ? 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#ffc480] font-bold'
+            : 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#E8F0FE] hover:bg-[#ffc480] transition-colors';
+        btn.textContent = 'Chunk ' + (idx + 1) + ' (' + formatTokenCount(chunk.token_count) + ')';
+        btn.setAttribute('data-chunk-index', String(idx));
+        btn.onclick = function () { selectChunk(chunks, idx); };
+        tabs.appendChild(btn);
+    });
+
+    // Show first chunk
+    selectChunk(chunks, 0);
+}
+
+function selectChunk(chunks, index) {
+    if (index < 0 || index >= chunks.length) { return; }
+
+    window.currentChunkIndex = index;
+    const chunk = chunks[index];
+
+    // Update content textarea
+    document.getElementById('result-content').value = chunk.content || '';
+
+    // Update info line
+    const info = document.getElementById('chunk-info');
+    if (info) {
+        info.textContent = 'Chunk ' + (index + 1) + '/' + chunk.total_chunks
+            + ' \u00B7 ' + chunk.files.length + ' files \u00B7 '
+            + formatTokenCount(chunk.token_count) + ' tokens';
+    }
+
+    // Update active tab styling
+    const tabs = document.getElementById('chunk-tabs');
+    if (tabs) {
+        Array.from(tabs.children).forEach((btn, idx) => {
+            if (idx === index) {
+                btn.className = 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#ffc480] font-bold';
+            } else {
+                btn.className = 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#E8F0FE] hover:bg-[#ffc480] transition-colors';
+            }
+        });
+    }
+}
+
+function hideChunkNavigation() {
+    window.currentChunks = null;
+    window.currentChunkIndex = 0;
+
+    const nav = document.getElementById('chunk-navigation');
+    const copyChunkBtn = document.getElementById('copy-chunk-btn');
+    if (nav) { nav.style.display = 'none'; }
+    if (copyChunkBtn) { copyChunkBtn.style.display = 'none'; }
+}
+
+function copyCurrentChunk() {
+    if (!window.currentChunks || window.currentChunks.length === 0) { return; }
+
+    const chunk = window.currentChunks[window.currentChunkIndex];
+    if (!chunk) { return; }
+
+    const button = document.querySelector('[onclick="copyCurrentChunk()"]');
+    if (!button) { return; }
+
+    const originalContent = button.innerHTML;
+
+    navigator.clipboard.writeText(chunk.content)
+        .then(() => {
+            button.innerHTML = 'Copied!';
+            setTimeout(() => { button.innerHTML = originalContent; }, 1000);
+        })
+        .catch((err) => {
+            console.error('Failed to copy chunk:', err);
+            button.innerHTML = 'Failed';
+            setTimeout(() => { button.innerHTML = originalContent; }, 1000);
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -567,3 +682,4 @@ window.copyText = copyText;
 window.copyFullDigest = copyFullDigest;
 window.downloadFullDigest = downloadFullDigest;
 window.submitExample = submitExample;
+window.copyCurrentChunk = copyCurrentChunk;
