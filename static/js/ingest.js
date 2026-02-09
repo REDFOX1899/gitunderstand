@@ -61,9 +61,12 @@ function applyPreset(presetName) {
 function _updatePresetButtons() {
     document.querySelectorAll('[data-preset]').forEach((btn) => {
         const isActive = btn.dataset.preset === _activePreset;
-        btn.classList.toggle('bg-[#ffc480]', isActive);
-        btn.classList.toggle('bg-[#E8F0FE]', !isActive);
-        btn.classList.toggle('font-bold', isActive);
+        btn.classList.toggle('bg-primary', isActive);
+        btn.classList.toggle('text-primary-foreground', isActive);
+        btn.classList.toggle('border-primary', isActive);
+        btn.classList.toggle('bg-secondary', !isActive);
+        btn.classList.toggle('border-stone-200', !isActive);
+        btn.classList.toggle('font-semibold', isActive);
     });
 }
 
@@ -98,7 +101,7 @@ function changePattern() {
     // Skip the first two tree line elements (header and repo name)
     treeLineElements.slice(2).forEach((element) => {
         element.classList.remove('line-through');
-        element.classList.remove('text-gray-500');
+        element.classList.remove('text-stone-400');
     });
 
     // Reset the pattern input field

@@ -19,7 +19,7 @@
         {# Web App Meta #}
         <meta name="apple-mobile-web-app-title"            content="GitUnderstand">
         <meta name="application-name"                      content="GitUnderstand">
-        <meta name="theme-color"                           content="#FCA847">
+        <meta name="theme-color"                           content="#0891b2">
         <meta name="mobile-web-app-capable"                content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         {# Twitter card #}
@@ -27,8 +27,8 @@
         <meta name="twitter:title"       content="GitUnderstand">
         <meta name="twitter:description"
               content="Turn any Git repository into a prompt-friendly text digest for LLMs.">
-        {# Favicon — inline SVG, no static file needed #}
-        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FCA847'/%3E%3Ctext y='.88em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui,sans-serif' font-weight='800' fill='%23111827'%3EG%3C/text%3E%3C/svg%3E">
+        {# Favicon — inline SVG with cyan brand #}
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230891b2'/%3E%3Ctext y='.88em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui,sans-serif' font-weight='800' fill='%23ffffff'%3EG%3C/text%3E%3C/svg%3E">
         {# Title #}
         <title>
             {% block title %}
@@ -43,6 +43,8 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+        {# Tabler Icons #}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
         tailwind.config = {
@@ -51,7 +53,25 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
                         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-                    }
+                    },
+                    colors: {
+                        border: '#e7e5e4',
+                        input: '#d6d3d1',
+                        ring: '#06b6d4',
+                        background: '#fafaf9',
+                        foreground: '#1c1917',
+                        primary: { DEFAULT: '#0891b2', foreground: '#ffffff', hover: '#0e7490' },
+                        secondary: { DEFAULT: '#f5f5f4', foreground: '#1c1917' },
+                        muted: { DEFAULT: '#f5f5f4', foreground: '#78716c' },
+                        accent: { DEFAULT: '#f0fdfa', foreground: '#0891b2' },
+                        destructive: { DEFAULT: '#ef4444', foreground: '#ffffff' },
+                        card: { DEFAULT: '#ffffff', foreground: '#1c1917' },
+                    },
+                    borderRadius: {
+                        lg: '0.5rem',
+                        md: 'calc(0.5rem - 2px)',
+                        sm: 'calc(0.5rem - 4px)',
+                    },
                 }
             }
         }
@@ -60,31 +80,37 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css">
         <style type="text/tailwindcss">
           :root {
-            --color-bg: #FFFDF8;
-            --color-surface: #fff4da;
-            --color-surface-alt: #fafafa;
-            --color-accent: #FCA847;
-            --color-accent-hover: #ffb14d;
-            --color-button: #ffc480;
-            --color-pink: #FE4A60;
-            --color-blue: #E8F0FE;
-            --color-border: #1f2937;
-            --color-text: #111827;
-            --color-text-muted: #6b7280;
+            --background: #fafaf9;
+            --foreground: #1c1917;
+            --card: #ffffff;
+            --card-foreground: #1c1917;
+            --muted: #f5f5f4;
+            --muted-foreground: #78716c;
+            --border: #e7e5e4;
+            --input: #d6d3d1;
+            --ring: #06b6d4;
+            --primary: #0891b2;
+            --primary-foreground: #ffffff;
+            --secondary: #f5f5f4;
+            --secondary-foreground: #1c1917;
+            --destructive: #ef4444;
+            --accent: #f0fdfa;
+            --accent-foreground: #0891b2;
+            --radius: 0.5rem;
           }
 
           @layer components {
             .badge-new {
-              @apply inline-block -rotate-6 -translate-y-1 mx-1 px-1 bg-[#FE4A60] border border-gray-900 text-white text-[10px] font-bold shadow-[2px_2px_0_0_rgba(0,0,0,1)];
+              @apply inline-block px-2 py-0.5 bg-cyan-50 border border-cyan-200 text-cyan-700 text-[10px] font-semibold rounded-full;
             }
             .landing-page-title {
-              @apply inline-block w-full relative text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl sm:pt-20 lg:pt-5 font-bold tracking-tighter;
+              @apply inline-block w-full relative text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl sm:pt-20 lg:pt-5 font-extrabold tracking-tighter text-foreground;
             }
             .intro-text {
-              @apply text-center text-gray-600 text-lg max-w-2xl mx-auto;
+              @apply text-center text-stone-500 text-lg max-w-2xl mx-auto;
             }
             .pattern-select {
-              @apply min-w-max appearance-none pr-6 pl-2 py-2 bg-[#e6e8eb] border-r-[3px] border-gray-900 cursor-pointer focus:outline-none;
+              @apply min-w-max appearance-none pr-6 pl-3 py-2 bg-stone-100 border-r border-stone-300 cursor-pointer focus:outline-none text-sm;
             }
           }
 
@@ -127,21 +153,21 @@
             100% { background-position: 200% 0; }
           }
           .skeleton {
-            background: linear-gradient(90deg, #fff4da 25%, #ffe8b5 50%, #fff4da 75%);
+            background: linear-gradient(90deg, #e7e5e4 25%, #d6d3d1 50%, #e7e5e4 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
-            border-radius: 4px;
+            border-radius: 0.375rem;
           }
 
           /* Custom scrollbar for chat area */
           .chat-scroll::-webkit-scrollbar { width: 5px; }
           .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-          .chat-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
-          .chat-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+          .chat-scroll::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 3px; }
+          .chat-scroll::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
 
-          /* Better focus styles */
+          /* Better focus styles — cyan ring */
           button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-            outline: 3px solid #FCA847;
+            outline: 2px solid #0891b2;
             outline-offset: 2px;
           }
 
@@ -153,7 +179,7 @@
             display: inline-block;
             width: 1rem;
             text-align: center;
-            color: #6b7280;
+            color: #78716c;
           }
           .tree-toggle.expanded {
             transform: rotate(90deg);
@@ -162,7 +188,7 @@
             cursor: pointer;
           }
           .tree-node-label:hover {
-            background-color: rgba(255, 196, 128, 0.3);
+            background-color: rgba(8, 145, 178, 0.08);
             border-radius: 0.25rem;
           }
           .tree-children {
@@ -172,7 +198,7 @@
             display: none;
           }
 
-          /* Prism.js overrides to match neo-brutalist theme */
+          /* Prism.js overrides to match shadcn theme */
           pre[class*="language-"] {
             background: transparent !important;
             margin: 0 !important;
@@ -193,24 +219,24 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.5rem 0.75rem;
-            background: #1f2937;
-            color: #f9fafb;
+            background: #1c1917;
+            color: #fafaf9;
             font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
             font-size: 0.8rem;
-            border-radius: 0.375rem 0.375rem 0 0;
-            border: 3px solid #1f2937;
+            border-radius: 0.5rem 0.5rem 0 0;
+            border: 1px solid #1c1917;
           }
           .highlighted-file-body {
             padding: 0.75rem;
-            background: #fffdf8;
-            border: 3px solid #1f2937;
+            background: #fafaf9;
+            border: 1px solid #e7e5e4;
             border-top: none;
-            border-radius: 0 0 0.375rem 0.375rem;
+            border-radius: 0 0 0.5rem 0.5rem;
             overflow-x: auto;
           }
         </style>
     </head>
-    <body class="bg-[#FFFDF8] min-h-screen flex flex-col font-sans">
+    <body class="bg-background min-h-screen flex flex-col font-sans text-foreground">
         {% include 'components/navbar.html' %}
         {# Main content wrapper #}
         <main class="flex-1 w-full">

@@ -50,7 +50,7 @@ function toggleFile(element) {
     }
 
     element.classList.toggle('line-through');
-    element.classList.toggle('text-gray-500');
+    element.classList.toggle('text-stone-400');
 
     const fileName = getFileName(element);
     const fileIndex = patternFiles.indexOf(fileName);
@@ -171,7 +171,7 @@ function setButtonLoadingState(submitButton, isLoading) {
     if (!isLoading) {
         submitButton.disabled = false;
         submitButton.innerHTML = submitButton.getAttribute('data-original-content') || 'Submit';
-        submitButton.classList.remove('bg-[#ffb14d]');
+        submitButton.classList.remove('opacity-80');
         return;
     }
 
@@ -182,14 +182,14 @@ function setButtonLoadingState(submitButton, isLoading) {
     submitButton.disabled = true;
     submitButton.innerHTML = `
         <div class="flex items-center justify-center">
-            <svg class="animate-spin h-5 w-5 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
             <span class="ml-2">Processing...</span>
         </div>
     `;
-    submitButton.classList.add('bg-[#ffb14d]');
+    submitButton.classList.add('opacity-80');
 }
 
 // ---------------------------------------------------------------------------
@@ -217,11 +217,11 @@ function renderTokenCounts(tokenCounts) {
     grid.innerHTML = '';
     for (const [model, count] of Object.entries(tokenCounts)) {
         const label = document.createElement('span');
-        label.className = 'text-gray-600';
+        label.className = 'text-muted-foreground';
         label.textContent = model;
 
         const value = document.createElement('span');
-        value.className = 'font-bold text-gray-900 text-right';
+        value.className = 'font-bold text-foreground text-right';
         value.textContent = formatTokenCount(count);
 
         grid.appendChild(label);
@@ -270,7 +270,7 @@ function handleSuccessfulResponse(data) {
             data.tree.split('\n').forEach((line) => {
                 const pre = document.createElement('pre');
                 pre.setAttribute('name', 'tree-line');
-                pre.className = 'cursor-pointer hover:line-through hover:text-gray-500';
+                pre.className = 'cursor-pointer hover:line-through hover:text-stone-400';
                 pre.textContent = line;
                 pre.onclick = function () { toggleFile(this); };
                 dirPre.appendChild(pre);
@@ -298,8 +298,8 @@ function handleSuccessfulResponse(data) {
     // Reset view toggle buttons
     const btnPlain = document.getElementById('btn-plain-view');
     const btnHighlight = document.getElementById('btn-highlight-view');
-    if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
-    if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+    if (btnPlain) { btnPlain.className = btnPlain.className.replace('text-muted-foreground', 'bg-primary text-primary-foreground shadow-sm').replace('hover:text-foreground', ''); }
+    if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-primary text-primary-foreground shadow-sm', 'text-muted-foreground hover:text-foreground'); }
 
     // Extract digest ID from digest_url for AI summaries
     window.currentDigestId = data.digest_url ? data.digest_url.split('/').pop() : null;
@@ -341,8 +341,8 @@ function renderChunkNavigation(chunks, targetModel) {
     chunks.forEach((chunk, idx) => {
         const btn = document.createElement('button');
         btn.className = idx === 0
-            ? 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#ffc480] font-bold'
-            : 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#E8F0FE] hover:bg-[#ffc480] transition-colors';
+            ? 'px-3 py-1 text-sm font-mono bg-primary text-primary-foreground rounded-md font-semibold shadow-sm'
+            : 'px-3 py-1 text-sm font-mono bg-secondary text-secondary-foreground rounded-md hover:bg-stone-200 transition-all';
         btn.textContent = 'Chunk ' + (idx + 1) + ' (' + formatTokenCount(chunk.token_count) + ')';
         btn.setAttribute('data-chunk-index', String(idx));
         btn.onclick = function () { selectChunk(chunks, idx); };
@@ -385,9 +385,9 @@ function selectChunk(chunks, index) {
     if (tabs) {
         Array.from(tabs.children).forEach((btn, idx) => {
             if (idx === index) {
-                btn.className = 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#ffc480] font-bold';
+                btn.className = 'px-3 py-1 text-sm font-mono bg-primary text-primary-foreground rounded-md font-semibold shadow-sm';
             } else {
-                btn.className = 'px-3 py-1 text-sm font-mono border-[3px] border-gray-900 rounded bg-[#E8F0FE] hover:bg-[#ffc480] transition-colors';
+                btn.className = 'px-3 py-1 text-sm font-mono bg-secondary text-secondary-foreground rounded-md hover:bg-stone-200 transition-all';
             }
         });
     }
@@ -499,13 +499,13 @@ function _buildTreeNode(node, isRoot) {
         // Name
         const nameSpan = document.createElement('span');
         nameSpan.textContent = node.name + '/';
-        nameSpan.className = 'font-bold text-gray-800';
+        nameSpan.className = 'font-bold text-stone-800';
         row.appendChild(nameSpan);
 
         // File count
         if (node.children && node.children.length > 0) {
             const count = document.createElement('span');
-            count.className = 'text-xs text-gray-400 ml-1';
+            count.className = 'text-xs text-muted-foreground ml-1';
             count.textContent = '(' + _countFiles(node) + ')';
             row.appendChild(count);
         }
@@ -524,14 +524,14 @@ function _buildTreeNode(node, isRoot) {
         // Name
         const nameSpan = document.createElement('span');
         nameSpan.textContent = node.name;
-        nameSpan.className = 'text-gray-700';
+        nameSpan.className = 'text-stone-700';
         row.appendChild(nameSpan);
 
         // Size
         const sizeStr = formatFileSize(node.size);
         if (sizeStr) {
             const size = document.createElement('span');
-            size.className = 'text-xs text-gray-400 ml-auto pl-2 tabular-nums';
+            size.className = 'text-xs text-muted-foreground ml-auto pl-2 tabular-nums';
             size.textContent = sizeStr;
             row.appendChild(size);
         }
@@ -703,7 +703,7 @@ function renderHighlightedContent(content) {
 
     const blocks = parseContentBlocks(content);
     if (blocks.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 p-4">No file blocks found to highlight.</p>';
+        container.innerHTML = '<p class="text-muted-foreground p-4">No file blocks found to highlight.</p>';
         return;
     }
 
@@ -721,7 +721,7 @@ function renderHighlightedContent(content) {
         header.appendChild(pathSpan);
 
         const copyBtn = document.createElement('button');
-        copyBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors';
+        copyBtn.className = 'text-xs px-2 py-0.5 rounded bg-stone-700 hover:bg-stone-600 text-stone-200 transition-colors';
         copyBtn.textContent = 'Copy';
         copyBtn.onclick = function () { copySingleFile(copyBtn, idx); };
         header.appendChild(copyBtn);
@@ -739,7 +739,7 @@ function renderHighlightedContent(content) {
             pre.className = 'text-sm font-mono whitespace-pre-wrap';
             pre.textContent = block.content;
             const note = document.createElement('p');
-            note.className = 'text-xs text-gray-400 mb-2';
+            note.className = 'text-xs text-muted-foreground mb-2';
             note.textContent = `(${lineCount.toLocaleString()} lines \u2014 syntax highlighting skipped for performance)`;
             body.appendChild(note);
             body.appendChild(pre);
@@ -800,8 +800,8 @@ function setContentView(mode) {
     if (mode === 'highlighted') {
         plainWrapper.classList.add('hidden');
         highlighted.classList.remove('hidden');
-        if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
-        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+        if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-primary text-primary-foreground shadow-sm', 'text-muted-foreground hover:text-foreground'); }
+        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('text-muted-foreground', 'bg-primary text-primary-foreground shadow-sm').replace('hover:text-foreground', ''); }
 
         // Lazy render
         if (!highlighted.dataset.rendered) {
@@ -811,8 +811,8 @@ function setContentView(mode) {
     } else {
         plainWrapper.classList.remove('hidden');
         highlighted.classList.add('hidden');
-        if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
-        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+        if (btnPlain) { btnPlain.className = btnPlain.className.replace('text-muted-foreground', 'bg-primary text-primary-foreground shadow-sm').replace('hover:text-foreground', ''); }
+        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-primary text-primary-foreground shadow-sm', 'text-muted-foreground hover:text-foreground'); }
     }
 }
 
@@ -927,19 +927,22 @@ function switchAITab(tab) {
     const tabSummaries = document.getElementById('ai-tab-summaries');
     const tabChat = document.getElementById('ai-tab-chat');
 
+    const activeTab = 'px-4 py-2 text-sm font-semibold text-primary border-b-2 border-primary transition-all';
+    const inactiveTab = 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent transition-all';
+
     if (tab === 'chat') {
         if (summariesPanel) { summariesPanel.classList.add('hidden'); }
         if (chatPanel) { chatPanel.classList.remove('hidden'); }
-        if (tabSummaries) { tabSummaries.className = tabSummaries.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
-        if (tabChat) { tabChat.className = tabChat.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+        if (tabSummaries) { tabSummaries.className = inactiveTab; }
+        if (tabChat) { tabChat.className = activeTab; }
         // Focus chat input
         const input = document.getElementById('chat-input');
         if (input) { setTimeout(() => input.focus(), 100); }
     } else {
         if (summariesPanel) { summariesPanel.classList.remove('hidden'); }
         if (chatPanel) { chatPanel.classList.add('hidden'); }
-        if (tabSummaries) { tabSummaries.className = tabSummaries.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
-        if (tabChat) { tabChat.className = tabChat.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+        if (tabSummaries) { tabSummaries.className = activeTab; }
+        if (tabChat) { tabChat.className = inactiveTab; }
     }
 }
 
@@ -975,11 +978,11 @@ function generateAISummary(summaryType) {
     // Highlight active button
     document.querySelectorAll('.ai-type-btn').forEach((btn) => {
         if (btn.dataset.aiType === summaryType) {
-            btn.classList.remove('bg-[#E8F0FE]');
-            btn.classList.add('bg-[#ffc480]');
+            btn.classList.remove('border-stone-200', 'bg-card');
+            btn.classList.add('border-cyan-500', 'bg-cyan-50', 'ring-1', 'ring-cyan-500');
         } else {
-            btn.classList.remove('bg-[#ffc480]');
-            btn.classList.add('bg-[#E8F0FE]');
+            btn.classList.remove('border-cyan-500', 'bg-cyan-50', 'ring-1', 'ring-cyan-500');
+            btn.classList.add('border-stone-200', 'bg-card');
         }
     });
 
@@ -1144,13 +1147,13 @@ function clearChat() {
     container.innerHTML = '';
     const welcome = document.createElement('div');
     welcome.className = 'chat-msg-assistant flex gap-3 animate-fade-in';
-    welcome.innerHTML = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+    welcome.innerHTML = '<div class="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">'
         + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
         + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
         + '</svg></div>'
-        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]">'
-        + '<p class="text-sm text-gray-800 font-medium">Hello! I have full context of this repository.</p>'
-        + '<p class="text-sm text-gray-600 mt-1">Ask me about architecture, code patterns, bugs, or anything else.</p>'
+        + '<div class="bg-card border border-stone-200 rounded-xl p-3 max-w-[80%] shadow-sm">'
+        + '<p class="text-sm text-foreground font-medium">Hello! I have full context of this repository.</p>'
+        + '<p class="text-sm text-muted-foreground mt-1">Ask me about architecture, code patterns, bugs, or anything else.</p>'
         + '</div>';
     container.appendChild(welcome);
 
@@ -1210,19 +1213,19 @@ function _appendChatMessage(role, content) {
 
     if (role === 'user') {
         wrapper.className += ' chat-msg-user flex gap-3 justify-end';
-        wrapper.innerHTML = '<div class="bg-[#E8F0FE] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]">'
-            + '<p class="text-sm text-gray-800 whitespace-pre-wrap">' + _escapeHtml(content) + '</p>'
-            + '<span class="text-[10px] text-gray-400 mt-1 block text-right">' + timeStr + '</span>'
+        wrapper.innerHTML = '<div class="bg-cyan-50 border border-cyan-200 rounded-xl p-3 max-w-[80%]">'
+            + '<p class="text-sm text-foreground whitespace-pre-wrap">' + _escapeHtml(content) + '</p>'
+            + '<span class="text-[10px] text-muted-foreground mt-1 block text-right">' + timeStr + '</span>'
             + '</div>'
-            + '<div class="w-8 h-8 rounded-lg bg-[#E8F0FE] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">You</div>';
+            + '<div class="w-8 h-8 rounded-lg bg-stone-200 text-stone-700 flex items-center justify-center flex-shrink-0 text-xs font-bold">You</div>';
     } else {
         wrapper.className += ' chat-msg-assistant flex gap-3';
-        const avatarHtml = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+        const avatarHtml = '<div class="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">'
             + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
             + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
             + '</svg></div>';
         const bubble = document.createElement('div');
-        bubble.className = 'bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]';
+        bubble.className = 'bg-card border border-stone-200 rounded-xl p-3 max-w-[80%] shadow-sm';
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'text-sm leading-relaxed';
@@ -1231,15 +1234,15 @@ function _appendChatMessage(role, content) {
 
         // Footer with timestamp and copy
         const footer = document.createElement('div');
-        footer.className = 'flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200';
+        footer.className = 'flex items-center justify-between mt-2 pt-1.5 border-t border-stone-200';
 
         const time = document.createElement('span');
-        time.className = 'text-[10px] text-gray-400';
+        time.className = 'text-[10px] text-muted-foreground';
         time.textContent = timeStr;
         footer.appendChild(time);
 
         const copyBtn = document.createElement('button');
-        copyBtn.className = 'text-[10px] text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1';
+        copyBtn.className = 'text-[10px] text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-1';
         copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> Copy';
         copyBtn.onclick = function () {
             navigator.clipboard.writeText(content).then(function () {
@@ -1279,14 +1282,14 @@ function _appendChatThinking() {
     const wrapper = document.createElement('div');
     wrapper.id = id;
     wrapper.className = 'chat-msg-assistant flex gap-3 animate-fade-in';
-    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">'
         + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
         + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
         + '</svg></div>'
-        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg px-4 py-3 flex items-center gap-1.5">'
-        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
-        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
-        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
+        + '<div class="bg-card border border-stone-200 rounded-xl px-4 py-3 flex items-center gap-1.5 shadow-sm">'
+        + '<span class="w-1.5 h-1.5 bg-stone-400 rounded-full typing-dot"></span>'
+        + '<span class="w-1.5 h-1.5 bg-stone-400 rounded-full typing-dot"></span>'
+        + '<span class="w-1.5 h-1.5 bg-stone-400 rounded-full typing-dot"></span>'
         + '</div>';
 
     container.appendChild(wrapper);
@@ -1328,8 +1331,8 @@ function _appendChatError(message) {
     const iconColor = isRateLimit ? 'text-amber-600' : 'text-red-600';
     const icon = isRateLimit ? '⏳' : '!';
 
-    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg ' + iconBg + ' border-[2px] ' + iconBorder + ' flex items-center justify-center flex-shrink-0 text-xs font-bold ' + iconColor + '">' + icon + '</div>'
-        + '<div class="' + bgColor + ' border-[2px] ' + borderColor + ' rounded-lg p-3 max-w-[80%]">'
+    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg ' + iconBg + ' border ' + iconBorder + ' flex items-center justify-center flex-shrink-0 text-xs font-bold ' + iconColor + '">' + icon + '</div>'
+        + '<div class="' + bgColor + ' border ' + borderColor + ' rounded-xl p-3 max-w-[80%]">'
         + '<p class="text-sm ' + textColor + '">' + _escapeHtml(friendlyMsg) + '</p>'
         + retryBtn + '</div>';
 
@@ -1429,15 +1432,15 @@ function renderMarkdownContent(markdown, container) {
         // Code blocks with language label and copy button
         .replace(/```(\w*)\n([\s\S]*?)```/g, function (match, lang, code) {
             var codeId = 'code-' + Math.random().toString(36).substr(2, 8);
-            var langLabel = lang ? '<span class="absolute top-2 right-12 text-[10px] text-gray-400 font-mono uppercase">' + lang + '</span>' : '';
+            var langLabel = lang ? '<span class="absolute top-2 right-12 text-[10px] text-stone-400 font-mono uppercase">' + lang + '</span>' : '';
             return '<div class="relative my-3">'
                 + langLabel
-                + '<button onclick="copyCodeBlock(\'' + codeId + '\')" class="absolute top-2 right-2 text-[10px] text-gray-400 hover:text-gray-200 px-1.5 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors">Copy</button>'
-                + '<pre id="' + codeId + '" class="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto font-mono leading-relaxed"><code>' + code + '</code></pre>'
+                + '<button onclick="copyCodeBlock(\'' + codeId + '\')" class="absolute top-2 right-2 text-[10px] text-stone-400 hover:text-stone-200 px-1.5 py-0.5 rounded bg-stone-700 hover:bg-stone-600 transition-colors">Copy</button>'
+                + '<pre id="' + codeId + '" class="bg-stone-900 text-stone-100 p-3 rounded-lg text-xs overflow-x-auto font-mono leading-relaxed"><code>' + code + '</code></pre>'
                 + '</div>';
         })
         // Inline code
-        .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-xs font-mono">$1</code>')
+        .replace(/`([^`]+)`/g, '<code class="bg-stone-200 px-1 rounded text-xs font-mono">$1</code>')
         // Headers
         .replace(/^#### (.+)$/gm, '<h4 class="font-bold text-sm mt-3 mb-1">$1</h4>')
         .replace(/^### (.+)$/gm, '<h3 class="font-bold text-base mt-4 mb-1">$1</h3>')
@@ -1453,7 +1456,7 @@ function renderMarkdownContent(markdown, container) {
         // Ordered lists
         .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
         // Horizontal rule
-        .replace(/^---$/gm, '<hr class="my-3 border-gray-300">')
+        .replace(/^---$/gm, '<hr class="my-3 border-stone-300">')
         // Line breaks (double newlines become paragraphs)
         .replace(/\n\n/g, '</p><p class="my-2">')
         .replace(/\n/g, '<br>');
