@@ -1,19 +1,22 @@
-"""AI-powered repository summary generation using Google Gemini."""
+"""AI-powered repository summary generation using Anthropic Claude."""
 
 from __future__ import annotations
 
 import logging
 from enum import StrEnum
 
-import google.generativeai as genai
+import anthropic
 
 logger = logging.getLogger(__name__)
 
-# Maximum characters to send to Gemini (leave room for prompt within 2M context)
+# Maximum characters to send to Claude (leave room for prompt within 200K context)
 MAX_CONTENT_CHARS = 1_500_000
 
 # Maximum characters for chat context (smaller to leave room for conversation history)
 MAX_CHAT_CONTEXT_CHARS = 500_000
+
+# Default model for AI generation
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
 
 class SummaryType(StrEnum):
@@ -81,12 +84,12 @@ async def generate_summary(
     content: str,
     summary_type: SummaryType,
 ) -> str:
-    """Generate an AI summary of a repository using Google Gemini.
+    """Generate an AI summary of a repository using Anthropic Claude.
 
     Parameters
     ----------
     api_key : str
-        Google Gemini API key.
+        Anthropic Claude API key.
     tree : str
         The directory tree structure of the repository.
     content : str
@@ -104,11 +107,11 @@ async def generate_summary(
     ValueError
         If the API key is empty.
     RuntimeError
-        If the Gemini API call fails.
+        If the Claude API call fails.
 
     """
     if not api_key:
-        msg = "Gemini API key is not configured"
+        msg = "Claude API key is not configured"
         raise ValueError(msg)
 
     # Truncate content if too large
@@ -116,25 +119,31 @@ async def generate_summary(
         content = content[:MAX_CONTENT_CHARS] + "\n\n... (content truncated for context limit)"
         logger.info("Truncated content from %d to %d chars", len(content), MAX_CONTENT_CHARS)
 
-    # Configure the API
-    genai.configure(api_key=api_key)
-
-    # Build the prompt
+    # Build the system prompt (Claude supports a dedicated system parameter)
     type_label = SUMMARY_TYPE_LABELS.get(summary_type, summary_type.value)
-    prompt = (
-        f"You are an expert software engineer analyzing a code repository.\n"
+    system_prompt = (
+        "You are an expert software engineer analyzing a code repository.\n"
         f"Generate a {type_label} for this repository.\n\n"
-        f"{SUMMARY_PROMPTS[summary_type]}\n\n"
+        f"{SUMMARY_PROMPTS[summary_type]}"
+    )
+
+    # User message contains the actual repository content
+    user_content = (
         f"## Directory Structure\n```\n{tree}\n```\n\n"
         f"## File Contents\n{content}"
     )
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = await model.generate_content_async(prompt)
-        result = response.text
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model=DEFAULT_MODEL,
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_content}],
+        )
+        result = response.content[0].text
     except Exception as exc:
-        logger.exception("Gemini API call failed for summary_type=%s", summary_type.value)
+        logger.exception("Claude API call failed for summary_type=%s", summary_type.value)
         msg = f"AI summary generation failed: {exc}"
         raise RuntimeError(msg) from exc
 
@@ -154,7 +163,7 @@ async def generate_chat_response(
     Parameters
     ----------
     api_key : str
-        Google Gemini API key.
+        Anthropic Claude API key.
     tree : str
         The directory tree structure of the repository.
     content : str
@@ -175,11 +184,11 @@ async def generate_chat_response(
     ValueError
         If the API key is empty.
     RuntimeError
-        If the Gemini API call fails.
+        If the Claude API call fails.
 
     """
     if not api_key:
-        msg = "Gemini API key is not configured"
+        msg = "Claude API key is not configured"
         raise ValueError(msg)
 
     # Truncate content if too large (smaller limit for chat to leave room for history)
@@ -187,11 +196,9 @@ async def generate_chat_response(
         content = content[:MAX_CHAT_CONTEXT_CHARS] + "\n\n... (content truncated for context limit)"
         logger.info("Truncated chat context to %d chars", MAX_CHAT_CONTEXT_CHARS)
 
-    # Configure the API
-    genai.configure(api_key=api_key)
-
-    # Build the system context
-    system_context = (
+    # Build the system prompt with repository context
+    # Claude's system parameter keeps this separate from the conversation
+    system_prompt = (
         "You are an expert software engineer acting as a helpful AI assistant "
         "that has deep knowledge of a specific code repository. You can answer "
         "questions about the code, architecture, bugs, best practices, and anything "
@@ -202,35 +209,24 @@ async def generate_chat_response(
         f"## File Contents\n{content}"
     )
 
-    # Build conversation parts for Gemini
-    # Gemini uses a list of Content objects with roles "user" and "model"
-    conversation_parts = []
-
-    # First message includes system context
+    # Build messages array — Claude uses standard user/assistant roles
+    messages: list[dict[str, str]] = []
     if history:
-        # Prepend system context to the first user message in history
-        for i, msg_item in enumerate(history):
-            role = "model" if msg_item["role"] == "assistant" else "user"
-            text = msg_item["content"]
-            if i == 0 and role == "user":
-                text = system_context + "\n\n---\n\nUser question: " + text
-            conversation_parts.append({"role": role, "parts": [text]})
-
-        # Add current message
-        conversation_parts.append({"role": "user", "parts": [message]})
-    else:
-        # No history — single message with context
-        conversation_parts.append({
-            "role": "user",
-            "parts": [system_context + "\n\n---\n\nUser question: " + message],
-        })
+        for msg_item in history:
+            messages.append({"role": msg_item["role"], "content": msg_item["content"]})
+    messages.append({"role": "user", "content": message})
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = await model.generate_content_async(conversation_parts)
-        result = response.text
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model=DEFAULT_MODEL,
+            max_tokens=4096,
+            system=system_prompt,
+            messages=messages,
+        )
+        result = response.content[0].text
     except Exception as exc:
-        logger.exception("Gemini chat API call failed")
+        logger.exception("Claude chat API call failed")
         msg = f"AI chat failed: {exc}"
         raise RuntimeError(msg) from exc
 

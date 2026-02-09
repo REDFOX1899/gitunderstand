@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     gcp_project_id: str = "gitunderstand"
     gcs_bucket_name: str = "gitunderstand-digests"
     github_token: str = ""
-    gemini_api_key: str = ""
+    claude_api_key: str = ""
     default_file_size_kb: int = 5120
     max_file_size_kb: int = 102400
 

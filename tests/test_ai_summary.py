@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.ai_summary import (
+    DEFAULT_MODEL,
     MAX_CHAT_CONTEXT_CHARS,
     MAX_CONTENT_CHARS,
     SUMMARY_PROMPTS,
@@ -46,6 +47,10 @@ class TestSummaryType:
             assert isinstance(prompt, str)
             assert len(prompt) > 50, f"Prompt for {st} is too short"
 
+    def test_default_model(self) -> None:
+        """DEFAULT_MODEL should be a Claude model identifier."""
+        assert "claude" in DEFAULT_MODEL
+
 
 class TestGenerateSummary:
     """Tests for the generate_summary async function."""
@@ -63,15 +68,21 @@ class TestGenerateSummary:
 
     @pytest.mark.asyncio
     async def test_generates_summary_with_mock(self) -> None:
-        """Should call Gemini API and return generated text."""
+        """Should call Claude API and return generated text."""
+        mock_text_block = MagicMock()
+        mock_text_block.text = "# Architecture Overview\nThis is a test summary."
+
         mock_response = MagicMock()
-        mock_response.text = "# Architecture Overview\nThis is a test summary."
+        mock_response.content = [mock_text_block]
 
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             result = await generate_summary(
                 api_key="fake-key",
@@ -81,23 +92,36 @@ class TestGenerateSummary:
             )
 
         assert "Architecture Overview" in result
-        mock_genai.configure.assert_called_once_with(api_key="fake-key")
-        mock_genai.GenerativeModel.assert_called_once_with("gemini-2.0-flash")
-        mock_model.generate_content_async.assert_awaited_once()
+        mock_anthropic.AsyncAnthropic.assert_called_once_with(api_key="fake-key")
+        mock_messages.create.assert_awaited_once()
+
+        # Verify the call used the correct model and system prompt
+        call_kwargs = mock_messages.create.call_args[1]
+        assert call_kwargs["model"] == DEFAULT_MODEL
+        assert "system" in call_kwargs
+        assert isinstance(call_kwargs["messages"], list)
+        assert len(call_kwargs["messages"]) == 1
+        assert call_kwargs["messages"][0]["role"] == "user"
 
     @pytest.mark.asyncio
     async def test_truncates_large_content(self) -> None:
         """Content exceeding MAX_CONTENT_CHARS should be truncated."""
         large_content = "x" * (MAX_CONTENT_CHARS + 10_000)
 
+        mock_text_block = MagicMock()
+        mock_text_block.text = "Summary of large repo"
+
         mock_response = MagicMock()
-        mock_response.text = "Summary of large repo"
+        mock_response.content = [mock_text_block]
 
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             result = await generate_summary(
                 api_key="fake-key",
@@ -108,17 +132,21 @@ class TestGenerateSummary:
 
         assert result == "Summary of large repo"
         # Verify the prompt was sent (content should have been truncated)
-        call_args = mock_model.generate_content_async.call_args[0][0]
-        assert "content truncated" in call_args
+        call_kwargs = mock_messages.create.call_args[1]
+        user_content = call_kwargs["messages"][0]["content"]
+        assert "content truncated" in user_content
 
     @pytest.mark.asyncio
     async def test_api_error_raises_runtime_error(self) -> None:
-        """Should wrap Gemini API errors in RuntimeError."""
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(side_effect=Exception("API quota exceeded"))
+        """Should wrap Claude API errors in RuntimeError."""
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(side_effect=Exception("API quota exceeded"))
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             with pytest.raises(RuntimeError, match="AI summary generation failed"):
                 await generate_summary(
@@ -181,15 +209,21 @@ class TestGenerateChatResponse:
 
     @pytest.mark.asyncio
     async def test_generates_chat_response_no_history(self) -> None:
-        """Should call Gemini API and return a chat response without history."""
+        """Should call Claude API and return a chat response without history."""
+        mock_text_block = MagicMock()
+        mock_text_block.text = "This project is a web application."
+
         mock_response = MagicMock()
-        mock_response.text = "This project is a web application."
+        mock_response.content = [mock_text_block]
 
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             result = await generate_chat_response(
                 api_key="fake-key",
@@ -199,32 +233,41 @@ class TestGenerateChatResponse:
             )
 
         assert result == "This project is a web application."
-        mock_genai.configure.assert_called_once_with(api_key="fake-key")
-        mock_genai.GenerativeModel.assert_called_once_with("gemini-2.0-flash")
-        mock_model.generate_content_async.assert_awaited_once()
+        mock_anthropic.AsyncAnthropic.assert_called_once_with(api_key="fake-key")
+        mock_messages.create.assert_awaited_once()
 
-        # Verify the conversation format (list of dicts with role/parts)
-        call_args = mock_model.generate_content_async.call_args[0][0]
-        assert isinstance(call_args, list)
-        assert len(call_args) == 1
-        assert call_args[0]["role"] == "user"
+        # Verify the call used system prompt and messages format
+        call_kwargs = mock_messages.create.call_args[1]
+        assert call_kwargs["model"] == DEFAULT_MODEL
+        assert "system" in call_kwargs
+        assert "Directory Structure" in call_kwargs["system"]
+        assert isinstance(call_kwargs["messages"], list)
+        assert len(call_kwargs["messages"]) == 1
+        assert call_kwargs["messages"][0]["role"] == "user"
+        assert call_kwargs["messages"][0]["content"] == "What does this project do?"
 
     @pytest.mark.asyncio
     async def test_generates_chat_response_with_history(self) -> None:
-        """Should include conversation history in the Gemini API call."""
-        mock_response = MagicMock()
-        mock_response.text = "The main entry point is app.py."
+        """Should include conversation history in the Claude API call."""
+        mock_text_block = MagicMock()
+        mock_text_block.text = "The main entry point is app.py."
 
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(return_value=mock_response)
+
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
 
         history = [
             {"role": "user", "content": "What does this project do?"},
             {"role": "assistant", "content": "It's a web app."},
         ]
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             result = await generate_chat_response(
                 api_key="fake-key",
@@ -235,27 +278,35 @@ class TestGenerateChatResponse:
             )
 
         assert result == "The main entry point is app.py."
-        call_args = mock_model.generate_content_async.call_args[0][0]
-        assert isinstance(call_args, list)
+        call_kwargs = mock_messages.create.call_args[1]
+        messages = call_kwargs["messages"]
+        assert isinstance(messages, list)
         # 2 history messages + 1 current = 3 total
-        assert len(call_args) == 3
-        assert call_args[0]["role"] == "user"
-        assert call_args[1]["role"] == "model"  # assistant -> model for Gemini
-        assert call_args[2]["role"] == "user"
+        assert len(messages) == 3
+        assert messages[0]["role"] == "user"
+        assert messages[1]["role"] == "assistant"  # Claude uses "assistant" directly
+        assert messages[2]["role"] == "user"
+        assert messages[2]["content"] == "What is the main entry point?"
 
     @pytest.mark.asyncio
     async def test_truncates_large_content_for_chat(self) -> None:
         """Content exceeding MAX_CHAT_CONTEXT_CHARS should be truncated."""
         large_content = "x" * (MAX_CHAT_CONTEXT_CHARS + 10_000)
 
+        mock_text_block = MagicMock()
+        mock_text_block.text = "Chat response about large repo"
+
         mock_response = MagicMock()
-        mock_response.text = "Chat response about large repo"
+        mock_response.content = [mock_text_block]
 
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             result = await generate_chat_response(
                 api_key="fake-key",
@@ -268,12 +319,15 @@ class TestGenerateChatResponse:
 
     @pytest.mark.asyncio
     async def test_api_error_raises_runtime_error(self) -> None:
-        """Should wrap Gemini API errors in RuntimeError."""
-        mock_model = MagicMock()
-        mock_model.generate_content_async = AsyncMock(side_effect=Exception("Rate limited"))
+        """Should wrap Claude API errors in RuntimeError."""
+        mock_messages = MagicMock()
+        mock_messages.create = AsyncMock(side_effect=Exception("Rate limited"))
 
-        with patch("core.ai_summary.genai") as mock_genai:
-            mock_genai.GenerativeModel.return_value = mock_model
+        mock_client = MagicMock()
+        mock_client.messages = mock_messages
+
+        with patch("core.ai_summary.anthropic") as mock_anthropic:
+            mock_anthropic.AsyncAnthropic.return_value = mock_client
 
             with pytest.raises(RuntimeError, match="AI chat failed"):
                 await generate_chat_response(
