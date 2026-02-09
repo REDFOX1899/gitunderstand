@@ -158,6 +158,7 @@ class IngestSuccessResponse(BaseModel):
     output_format: str = Field(default="text", description="Output format used")
     chunks: list[ChunkInfo] | None = Field(default=None, description="Chunked digest content")
     target_model: str | None = Field(default=None, description="Target model used for chunking")
+    tree_structure: dict | None = Field(default=None, description="Structured JSON tree for interactive rendering")
 
 
 class IngestErrorResponse(BaseModel):

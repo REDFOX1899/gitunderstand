@@ -34,7 +34,7 @@ class TestIngestQuery:
     def test_ingest_basic_directory(self, temp_directory: Path) -> None:
         """Test ingesting a basic directory structure."""
         query = _make_query(temp_directory)
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         assert summary is not None
         assert tree is not None
@@ -47,7 +47,7 @@ class TestIngestQuery:
     def test_ingest_counts_files(self, temp_directory: Path) -> None:
         """Test that ingestion counts files correctly."""
         query = _make_query(temp_directory)
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         # Should find all 8 files in the temp_directory fixture
         assert "file1.txt" in content
@@ -57,7 +57,7 @@ class TestIngestQuery:
     def test_ingest_with_ignore_patterns(self, temp_directory: Path) -> None:
         """Test that ignore patterns filter out files."""
         query = _make_query(temp_directory, ignore_patterns={"*.py"})
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         # .py files should be excluded
         assert "file2.py" not in tree
@@ -68,7 +68,7 @@ class TestIngestQuery:
     def test_ingest_with_include_patterns(self, temp_directory: Path) -> None:
         """Test that include patterns only include matching files."""
         query = _make_query(temp_directory, include_patterns={"*.txt"})
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         # Only .txt files should be present
         assert "file1.txt" in tree
@@ -78,7 +78,7 @@ class TestIngestQuery:
         """Test ingesting a single file."""
         file_path = temp_directory / "file1.txt"
         query = _make_query(file_path, type="blob")
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         assert "Hello World" in content
 
@@ -89,7 +89,7 @@ class TestIngestQuery:
         large_file.write_text("x" * 10_000)
 
         query = _make_query(temp_directory, max_file_size=100)
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         # Oversized files are completely skipped (not in tree or content)
         assert "large.txt" not in tree
@@ -100,7 +100,7 @@ class TestIngestQuery:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         query = _make_query(empty_dir)
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, _tree_json = ingest_query(query)
 
         assert summary is not None
         assert tree is not None

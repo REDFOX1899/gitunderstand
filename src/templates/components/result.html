@@ -85,20 +85,48 @@
                                 </button>
                             </div>
                         </div>
+                        <!-- Tree toolbar (search + expand/collapse) -->
+                        <div id="tree-toolbar" class="flex items-center gap-2 mb-2 hidden">
+                            <div class="relative flex-1">
+                                <input type="text" id="tree-search" placeholder="Filter files..."
+                                       class="w-full px-2 py-1 text-sm border-[3px] border-gray-900 rounded bg-[#E8F0FE] focus:outline-none"
+                                       oninput="filterTree(this.value)">
+                            </div>
+                            <button onclick="expandAllTree()" class="px-2 py-1 text-xs bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors">
+                                Expand
+                            </button>
+                            <button onclick="collapseAllTree()" class="px-2 py-1 text-xs bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors">
+                                Collapse
+                            </button>
+                        </div>
                         <div class="relative">
                             <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                            <div class="directory-structure w-full p-4 bg-[#fff4da] border-[3px] border-gray-900 rounded font-mono text-sm resize-y focus:outline-none relative z-10 h-[215px] overflow-auto"
+                            <div class="directory-structure w-full p-4 bg-[#fff4da] border-[3px] border-gray-900 rounded font-mono text-sm resize-y focus:outline-none relative z-10 h-[300px] overflow-auto"
                                  id="directory-structure-container"
                                  readonly>
                                 <input type="hidden" id="directory-structure-content" value="" />
                                 <pre id="directory-structure-pre"></pre>
+                                <div id="interactive-tree" class="hidden"></div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-gray-900">Files Content</h3>
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-bold text-gray-900">Files Content</h3>
+                            <!-- View toggle: Plain / Highlighted -->
+                            <div id="view-toggle" class="hidden flex border-[3px] border-gray-900 rounded overflow-hidden">
+                                <button onclick="setContentView('plain')" id="btn-plain-view"
+                                        class="px-3 py-1 text-xs font-bold bg-[#ffc480] border-r-[3px] border-gray-900 transition-colors">
+                                    Plain
+                                </button>
+                                <button onclick="setContentView('highlighted')" id="btn-highlight-view"
+                                        class="px-3 py-1 text-xs font-bold bg-[#E8F0FE] transition-colors">
+                                    Highlighted
+                                </button>
+                            </div>
+                        </div>
                         <div class="flex items-center gap-3">
                             <!-- Copy chunk button (hidden when no chunks) -->
                             <div id="copy-chunk-btn" class="relative group" style="display:none">
@@ -131,12 +159,16 @@
                         </div>
                         <div id="chunk-tabs" class="flex flex-wrap gap-2"></div>
                     </div>
-                    <div class="relative">
+                    <div class="relative" id="plain-content-wrapper">
                         <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
                         <textarea id="result-content"
                                   class="result-text w-full p-4 bg-[#fff4da] border-[3px] border-gray-900 rounded font-mono text-sm resize-y focus:outline-none relative z-10"
                                   style="min-height: 600px"
                                   readonly></textarea>
+                    </div>
+                    <!-- Syntax-highlighted content view (hidden by default) -->
+                    <div id="highlighted-content" class="hidden overflow-auto rounded"
+                         style="min-height: 600px; max-height: 80vh;">
                     </div>
                 </div>
             </div>

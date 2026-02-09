@@ -196,7 +196,7 @@ async def process_query(
     short_repo_url = f"{query.user_name}/{query.repo_name}"
 
     try:
-        summary, tree, content, token_counts = ingest_query(query)
+        summary, tree, content, token_counts, tree_json = ingest_query(query)
         digest_content = tree + "\n" + content
         digest_url = _store_digest(query, clone_config, digest_content, summary, tree, content)
     except Exception as exc:
@@ -235,6 +235,7 @@ async def process_query(
         output_format=output_format.value,
         chunks=chunks_data,
         target_model=target_model,
+        tree_structure=tree_json,
     )
 
 
@@ -326,7 +327,7 @@ async def process_query_streaming(
     try:
         # Run synchronous ingest_query in a worker thread so the event loop
         # remains responsive and can push SSE events from the Queue.
-        summary, tree, content, token_counts = await asyncio.to_thread(ingest_query, query, reporter)
+        summary, tree, content, token_counts, tree_json = await asyncio.to_thread(ingest_query, query, reporter)
 
         # Stage: Storing
         if reporter:
@@ -368,6 +369,7 @@ async def process_query_streaming(
         output_format=output_format.value,
         chunks=chunks_data,
         target_model=target_model,
+        tree_structure=tree_json,
     )
 
     # Stage: Complete

@@ -252,20 +252,54 @@ function handleSuccessfulResponse(data) {
         hideChunkNavigation();
     }
 
-    // Populate directory structure lines as clickable <pre> elements
-    const dirPre = document.getElementById('directory-structure-pre');
+    // Render interactive tree if JSON tree data is available
+    if (data.tree_structure) {
+        renderInteractiveTree(data.tree_structure);
+    } else {
+        // Fallback: populate directory structure lines as clickable <pre> elements
+        const dirPre = document.getElementById('directory-structure-pre');
+        const interactiveTree = document.getElementById('interactive-tree');
+        const toolbar = document.getElementById('tree-toolbar');
 
-    if (dirPre && data.tree) {
-        dirPre.innerHTML = '';
-        data.tree.split('\n').forEach((line) => {
-            const pre = document.createElement('pre');
-            pre.setAttribute('name', 'tree-line');
-            pre.className = 'cursor-pointer hover:line-through hover:text-gray-500';
-            pre.textContent = line;
-            pre.onclick = function () { toggleFile(this); };
-            dirPre.appendChild(pre);
-        });
+        if (interactiveTree) { interactiveTree.classList.add('hidden'); }
+        if (toolbar) { toolbar.classList.add('hidden'); }
+        if (dirPre) { dirPre.classList.remove('hidden'); }
+
+        if (dirPre && data.tree) {
+            dirPre.innerHTML = '';
+            data.tree.split('\n').forEach((line) => {
+                const pre = document.createElement('pre');
+                pre.setAttribute('name', 'tree-line');
+                pre.className = 'cursor-pointer hover:line-through hover:text-gray-500';
+                pre.textContent = line;
+                pre.onclick = function () { toggleFile(this); };
+                dirPre.appendChild(pre);
+            });
+        }
     }
+
+    // Show view toggle for text output format (other formats have different separators)
+    const viewToggle = document.getElementById('view-toggle');
+    if (viewToggle) {
+        const fmt = (data.output_format || 'text').toLowerCase();
+        viewToggle.classList.toggle('hidden', fmt !== 'text');
+    }
+
+    // Reset highlighted content view
+    const highlighted = document.getElementById('highlighted-content');
+    if (highlighted) {
+        highlighted.innerHTML = '';
+        delete highlighted.dataset.rendered;
+        highlighted.classList.add('hidden');
+    }
+    const plainWrapper = document.getElementById('plain-content-wrapper');
+    if (plainWrapper) { plainWrapper.classList.remove('hidden'); }
+
+    // Reset view toggle buttons
+    const btnPlain = document.getElementById('btn-plain-view');
+    const btnHighlight = document.getElementById('btn-highlight-view');
+    if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+    if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
 
     // Scroll to results
     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -322,6 +356,16 @@ function selectChunk(chunks, index) {
     // Update content textarea
     document.getElementById('result-content').value = chunk.content || '';
 
+    // Reset highlighted view so it re-renders for this chunk
+    const highlighted = document.getElementById('highlighted-content');
+    if (highlighted && highlighted.dataset.rendered) {
+        delete highlighted.dataset.rendered;
+        // If currently viewing highlighted, re-render immediately
+        if (!highlighted.classList.contains('hidden')) {
+            renderHighlightedContent(chunk.content);
+        }
+    }
+
     // Update info line
     const info = document.getElementById('chunk-info');
     if (info) {
@@ -374,6 +418,396 @@ function copyCurrentChunk() {
             button.innerHTML = 'Failed';
             setTimeout(() => { button.innerHTML = originalContent; }, 1000);
         });
+}
+
+// ---------------------------------------------------------------------------
+// Interactive Tree (8A)
+// ---------------------------------------------------------------------------
+
+const EXT_COLORS = {
+    '.py': '#3572A5', '.js': '#f1e05a', '.ts': '#3178c6', '.tsx': '#3178c6',
+    '.jsx': '#f1e05a', '.go': '#00ADD8', '.rs': '#dea584', '.java': '#b07219',
+    '.cpp': '#f34b7d', '.c': '#555555', '.h': '#555555', '.cs': '#178600',
+    '.swift': '#F05138', '.kt': '#A97BFF', '.rb': '#701516', '.php': '#4F5D95',
+    '.html': '#e34c26', '.css': '#663399', '.scss': '#c6538c', '.json': '#292929',
+    '.yml': '#cb171e', '.yaml': '#cb171e', '.md': '#083fa1', '.sql': '#e38c00',
+    '.sh': '#89e051', '.bash': '#89e051', '.dockerfile': '#384d54',
+    '.toml': '#9c4221', '.xml': '#0060ac', '.vue': '#41b883', '.svelte': '#ff3e00',
+};
+
+function getFileExtColor(name) {
+    const idx = name.lastIndexOf('.');
+    if (idx === -1) { return '#6b7280'; }
+    return EXT_COLORS[name.substring(idx).toLowerCase()] || '#6b7280';
+}
+
+function formatFileSize(bytes) {
+    if (bytes == null || bytes === 0) { return ''; }
+    if (bytes >= 1048576) { return (bytes / 1048576).toFixed(1) + ' MB'; }
+    if (bytes >= 1024) { return (bytes / 1024).toFixed(1) + ' kB'; }
+    return bytes + ' B';
+}
+
+function renderInteractiveTree(treeData) {
+    const container = document.getElementById('interactive-tree');
+    const plainPre = document.getElementById('directory-structure-pre');
+    const toolbar = document.getElementById('tree-toolbar');
+    if (!container) { return; }
+
+    container.innerHTML = '';
+    container.classList.remove('hidden');
+    if (plainPre) { plainPre.classList.add('hidden'); }
+    if (toolbar) { toolbar.classList.remove('hidden'); }
+
+    const rootEl = _buildTreeNode(treeData, true);
+    container.appendChild(rootEl);
+}
+
+function _buildTreeNode(node, isRoot) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tree-node';
+    wrapper.dataset.path = node.path || '';
+    wrapper.dataset.name = (node.name || '').toLowerCase();
+
+    const isDir = node.type === 'directory';
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-1 py-[1px] tree-node-label';
+
+    if (isDir) {
+        // Toggle arrow
+        const arrow = document.createElement('span');
+        arrow.className = 'tree-toggle expanded';
+        arrow.textContent = '\u25B6';
+        arrow.onclick = function (e) {
+            e.stopPropagation();
+            _toggleTreeDir(wrapper);
+        };
+        row.appendChild(arrow);
+
+        // Folder icon
+        const icon = document.createElement('span');
+        icon.textContent = '\uD83D\uDCC1';
+        icon.className = 'text-sm';
+        row.appendChild(icon);
+
+        // Name
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = node.name + '/';
+        nameSpan.className = 'font-bold text-gray-800';
+        row.appendChild(nameSpan);
+
+        // File count
+        if (node.children && node.children.length > 0) {
+            const count = document.createElement('span');
+            count.className = 'text-xs text-gray-400 ml-1';
+            count.textContent = '(' + _countFiles(node) + ')';
+            row.appendChild(count);
+        }
+    } else {
+        // Spacer for alignment (matches toggle width)
+        const spacer = document.createElement('span');
+        spacer.className = 'inline-block w-4';
+        row.appendChild(spacer);
+
+        // Colored dot
+        const dot = document.createElement('span');
+        dot.className = 'inline-block w-2 h-2 rounded-full mr-1 flex-shrink-0';
+        dot.style.backgroundColor = getFileExtColor(node.name || '');
+        row.appendChild(dot);
+
+        // Name
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = node.name;
+        nameSpan.className = 'text-gray-700';
+        row.appendChild(nameSpan);
+
+        // Size
+        const sizeStr = formatFileSize(node.size);
+        if (sizeStr) {
+            const size = document.createElement('span');
+            size.className = 'text-xs text-gray-400 ml-auto pl-2 tabular-nums';
+            size.textContent = sizeStr;
+            row.appendChild(size);
+        }
+    }
+
+    wrapper.appendChild(row);
+
+    // Children
+    if (isDir && node.children && node.children.length > 0) {
+        const childContainer = document.createElement('div');
+        childContainer.className = 'tree-children';
+        node.children.forEach((child) => {
+            childContainer.appendChild(_buildTreeNode(child, false));
+        });
+        wrapper.appendChild(childContainer);
+    }
+
+    return wrapper;
+}
+
+function _countFiles(node) {
+    if (node.type !== 'directory') { return 1; }
+    if (!node.children) { return 0; }
+    return node.children.reduce((sum, c) => sum + _countFiles(c), 0);
+}
+
+function _toggleTreeDir(nodeEl) {
+    const arrow = nodeEl.querySelector(':scope > .tree-node-label > .tree-toggle');
+    const children = nodeEl.querySelector(':scope > .tree-children');
+    if (!arrow || !children) { return; }
+
+    const isExpanded = arrow.classList.contains('expanded');
+    arrow.classList.toggle('expanded', !isExpanded);
+    children.classList.toggle('collapsed', isExpanded);
+}
+
+function expandAllTree() {
+    document.querySelectorAll('#interactive-tree .tree-toggle').forEach((arrow) => {
+        arrow.classList.add('expanded');
+    });
+    document.querySelectorAll('#interactive-tree .tree-children').forEach((c) => {
+        c.classList.remove('collapsed');
+    });
+}
+
+function collapseAllTree() {
+    document.querySelectorAll('#interactive-tree .tree-toggle').forEach((arrow) => {
+        arrow.classList.remove('expanded');
+    });
+    document.querySelectorAll('#interactive-tree .tree-children').forEach((c) => {
+        c.classList.add('collapsed');
+    });
+}
+
+function filterTree(query) {
+    const q = (query || '').toLowerCase().trim();
+    const container = document.getElementById('interactive-tree');
+    if (!container) { return; }
+
+    const allNodes = container.querySelectorAll('.tree-node');
+
+    if (!q) {
+        // Show everything
+        allNodes.forEach((n) => { n.style.display = ''; });
+        return;
+    }
+
+    // First hide all, then show matches + their ancestors
+    allNodes.forEach((n) => { n.style.display = 'none'; });
+
+    allNodes.forEach((n) => {
+        const name = n.dataset.name || '';
+        const path = (n.dataset.path || '').toLowerCase();
+        if (name.includes(q) || path.includes(q)) {
+            // Show this node and all ancestors
+            let el = n;
+            while (el) {
+                el.style.display = '';
+                // Expand parent dirs
+                const arrow = el.querySelector(':scope > .tree-node-label > .tree-toggle');
+                const children = el.querySelector(':scope > .tree-children');
+                if (arrow) { arrow.classList.add('expanded'); }
+                if (children) { children.classList.remove('collapsed'); }
+
+                el = el.parentElement?.closest('.tree-node') || null;
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Syntax Highlighting (8B)
+// ---------------------------------------------------------------------------
+
+const EXT_TO_PRISM = {
+    '.py': 'python', '.js': 'javascript', '.ts': 'typescript', '.tsx': 'tsx',
+    '.jsx': 'jsx', '.go': 'go', '.rs': 'rust', '.java': 'java',
+    '.cpp': 'cpp', '.c': 'c', '.h': 'c', '.cs': 'csharp',
+    '.swift': 'swift', '.kt': 'kotlin', '.rb': 'ruby', '.php': 'php',
+    '.html': 'html', '.css': 'css', '.scss': 'scss', '.json': 'json',
+    '.yml': 'yaml', '.yaml': 'yaml', '.md': 'markdown', '.sql': 'sql',
+    '.sh': 'bash', '.bash': 'bash', '.dockerfile': 'docker',
+    '.toml': 'toml', '.xml': 'xml', '.vue': 'markup', '.svelte': 'javascript',
+    '.r': 'r', '.lua': 'lua', '.dart': 'dart', '.pl': 'perl',
+    '.ex': 'elixir', '.exs': 'elixir', '.hs': 'haskell', '.clj': 'clojure',
+    '.scala': 'scala', '.erl': 'erlang', '.ini': 'ini', '.cfg': 'ini',
+    '.makefile': 'makefile', '.mk': 'makefile',
+};
+
+const SEPARATOR = '================================================';
+
+function detectPrismLanguage(filePath) {
+    if (!filePath) { return 'plain'; }
+    const name = filePath.split('/').pop() || '';
+
+    // Special filenames
+    const lower = name.toLowerCase();
+    if (lower === 'dockerfile') { return 'docker'; }
+    if (lower === 'makefile' || lower === 'gnumakefile') { return 'makefile'; }
+    if (lower.endsWith('.env') || lower.startsWith('.env')) { return 'bash'; }
+
+    const idx = name.lastIndexOf('.');
+    if (idx === -1) { return 'plain'; }
+    return EXT_TO_PRISM[name.substring(idx).toLowerCase()] || 'plain';
+}
+
+function parseContentBlocks(content) {
+    if (!content) { return []; }
+
+    const blocks = [];
+    // Split on separator lines. Each file block is:
+    // SEPARATOR\nFILE: path\nSEPARATOR\ncontent
+    const parts = content.split(SEPARATOR);
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!part.trim()) { continue; }
+
+        const lines = part.split('\n');
+        let filePath = null;
+        let contentStart = 0;
+
+        for (let j = 0; j < lines.length; j++) {
+            const line = lines[j].trim();
+            if (line.startsWith('FILE:') || line.startsWith('DIRECTORY:') || line.startsWith('SYMLINK:')) {
+                filePath = line.split(':').slice(1).join(':').trim();
+                // Content starts after the next separator (which is consumed by the split)
+                contentStart = j + 1;
+                break;
+            }
+        }
+
+        if (filePath) {
+            const fileContent = lines.slice(contentStart).join('\n').trim();
+            if (fileContent) {
+                blocks.push({ path: filePath, content: fileContent });
+            }
+        }
+    }
+
+    return blocks;
+}
+
+function renderHighlightedContent(content) {
+    const container = document.getElementById('highlighted-content');
+    if (!container) { return; }
+
+    container.innerHTML = '';
+
+    const blocks = parseContentBlocks(content);
+    if (blocks.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 p-4">No file blocks found to highlight.</p>';
+        return;
+    }
+
+    blocks.forEach((block, idx) => {
+        const lang = detectPrismLanguage(block.path);
+        const blockEl = document.createElement('div');
+        blockEl.className = 'highlighted-file-block';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'highlighted-file-header';
+
+        const pathSpan = document.createElement('span');
+        pathSpan.textContent = block.path;
+        header.appendChild(pathSpan);
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors';
+        copyBtn.textContent = 'Copy';
+        copyBtn.onclick = function () { copySingleFile(copyBtn, idx); };
+        header.appendChild(copyBtn);
+
+        blockEl.appendChild(header);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'highlighted-file-body';
+
+        const lineCount = block.content.split('\n').length;
+        if (lineCount > 5000) {
+            // Skip highlighting for very large files
+            const pre = document.createElement('pre');
+            pre.className = 'text-sm font-mono whitespace-pre-wrap';
+            pre.textContent = block.content;
+            const note = document.createElement('p');
+            note.className = 'text-xs text-gray-400 mb-2';
+            note.textContent = `(${lineCount.toLocaleString()} lines \u2014 syntax highlighting skipped for performance)`;
+            body.appendChild(note);
+            body.appendChild(pre);
+        } else {
+            const pre = document.createElement('pre');
+            pre.className = `language-${lang}`;
+            const code = document.createElement('code');
+            code.className = `language-${lang}`;
+            code.textContent = block.content;
+            pre.appendChild(code);
+            body.appendChild(pre);
+        }
+
+        blockEl.appendChild(body);
+        container.appendChild(blockEl);
+    });
+
+    // Store blocks for copy
+    container._parsedBlocks = blocks;
+
+    // Trigger Prism highlighting
+    if (typeof Prism !== 'undefined' && Prism.highlightAllUnder) {
+        Prism.highlightAllUnder(container);
+    }
+
+    container.dataset.rendered = 'true';
+}
+
+window._highlightedBlocks = [];
+
+function copySingleFile(button, index) {
+    const container = document.getElementById('highlighted-content');
+    if (!container || !container._parsedBlocks) { return; }
+
+    const block = container._parsedBlocks[index];
+    if (!block) { return; }
+
+    const original = button.textContent;
+    navigator.clipboard.writeText(block.content)
+        .then(() => {
+            button.textContent = 'Copied!';
+            setTimeout(() => { button.textContent = original; }, 1000);
+        })
+        .catch(() => {
+            button.textContent = 'Failed';
+            setTimeout(() => { button.textContent = original; }, 1000);
+        });
+}
+
+function setContentView(mode) {
+    const plainWrapper = document.getElementById('plain-content-wrapper');
+    const highlighted = document.getElementById('highlighted-content');
+    const btnPlain = document.getElementById('btn-plain-view');
+    const btnHighlight = document.getElementById('btn-highlight-view');
+
+    if (!plainWrapper || !highlighted) { return; }
+
+    if (mode === 'highlighted') {
+        plainWrapper.classList.add('hidden');
+        highlighted.classList.remove('hidden');
+        if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+
+        // Lazy render
+        if (!highlighted.dataset.rendered) {
+            const content = document.getElementById('result-content').value;
+            renderHighlightedContent(content);
+        }
+    } else {
+        plainWrapper.classList.remove('hidden');
+        highlighted.classList.add('hidden');
+        if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+        if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -683,3 +1117,9 @@ window.copyFullDigest = copyFullDigest;
 window.downloadFullDigest = downloadFullDigest;
 window.submitExample = submitExample;
 window.copyCurrentChunk = copyCurrentChunk;
+// Phase 8: Interactive tree + syntax highlighting
+window.filterTree = filterTree;
+window.expandAllTree = expandAllTree;
+window.collapseAllTree = collapseAllTree;
+window.setContentView = setContentView;
+window.copySingleFile = copySingleFile;

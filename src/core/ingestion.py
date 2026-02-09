@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 def ingest_query(
     query: IngestionQuery,
     reporter: ProgressReporter | None = None,
-) -> tuple[str, str, str, dict[str, int]]:
+) -> tuple[str, str, str, dict[str, int], dict]:
     """Run the ingestion process for a parsed query.
 
     This is the main entry point for analyzing a codebase directory or single file. It processes the query
     parameters, reads the file or directory content, and generates a summary, directory structure, and file content,
-    along with token estimations.
+    along with token estimations and a JSON tree structure.
 
     Parameters
     ----------
@@ -39,8 +39,9 @@ def ingest_query(
 
     Returns
     -------
-    tuple[str, str, str, dict[str, int]]
-        A tuple containing the summary, directory structure, file contents, and token counts per model.
+    tuple[str, str, str, dict[str, int], dict]
+        A tuple containing the summary, directory structure, file contents, token counts per model,
+        and a JSON-serializable tree structure for interactive rendering.
 
     Raises
     ------

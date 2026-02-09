@@ -17,8 +17,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, str, dict[str, int]]:
-    """Generate a summary, directory structure, file contents, and token counts for a file system node.
+def format_node(
+    node: FileSystemNode,
+    query: IngestionQuery,
+) -> tuple[str, str, str, dict[str, int], dict]:
+    """Generate a summary, directory structure, file contents, token counts, and tree JSON for a file system node.
 
     If the node represents a directory, the function will recursively process its contents.
 
@@ -31,8 +34,9 @@ def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, 
 
     Returns
     -------
-    tuple[str, str, str, dict[str, int]]
-        A tuple containing the summary, directory structure, file contents, and token counts per model.
+    tuple[str, str, str, dict[str, int], dict]
+        A tuple containing the summary, directory structure, file contents, token counts per model,
+        and a JSON-serializable tree structure for interactive rendering.
 
     """
     is_single_file = node.type == FileSystemNodeType.FILE
@@ -62,7 +66,9 @@ def format_node(node: FileSystemNode, query: IngestionQuery) -> tuple[str, str, 
         for model_name, count in token_counts.items():
             summary += f"  {model_name}: {format_token_count(count)}\n"
 
-    return summary, tree, content, token_counts
+    tree_json = _create_tree_json(node)
+
+    return summary, tree, content, token_counts, tree_json
 
 
 def _create_summary_prefix(query: IngestionQuery, *, single_file: bool = False) -> str:
@@ -127,6 +133,33 @@ def _gather_file_contents(node: FileSystemNode) -> str:
 
     # Recursively gather contents of all files under the current directory
     return "\n".join(_gather_file_contents(child) for child in node.children)
+
+
+def _create_tree_json(node: FileSystemNode) -> dict:
+    """Convert a ``FileSystemNode`` into a JSON-serializable dict for interactive tree rendering.
+
+    Parameters
+    ----------
+    node : FileSystemNode
+        The file system node to convert.
+
+    Returns
+    -------
+    dict
+        A nested dictionary with ``name``, ``type``, ``path``, ``size``, and ``children`` keys.
+
+    """
+    result: dict = {
+        "name": node.name,
+        "type": node.type.name.lower(),  # "directory", "file", "symlink"
+        "path": node.path_str,
+        "size": node.size,
+    }
+    if node.type == FileSystemNodeType.DIRECTORY and node.children:
+        result["children"] = [_create_tree_json(child) for child in node.children]
+    else:
+        result["children"] = []
+    return result
 
 
 def _create_tree_structure(

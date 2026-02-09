@@ -25,6 +25,26 @@
                     </button>
                 </div>
             </div>
+            <!-- Preset profiles -->
+            <div class="mt-5 flex flex-wrap items-center gap-2">
+                <span class="text-sm text-gray-600 font-medium mr-1">Presets:</span>
+                <button type="button" data-preset="code-review" onclick="applyPreset('code-review')"
+                        class="px-3 py-1 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded transition-colors duration-200 hover:bg-[#ffc480] relative hover:-translate-y-px hover:-translate-x-px">
+                    Code Review
+                </button>
+                <button type="button" data-preset="documentation" onclick="applyPreset('documentation')"
+                        class="px-3 py-1 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded transition-colors duration-200 hover:bg-[#ffc480] relative hover:-translate-y-px hover:-translate-x-px">
+                    Documentation
+                </button>
+                <button type="button" data-preset="architecture" onclick="applyPreset('architecture')"
+                        class="px-3 py-1 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded transition-colors duration-200 hover:bg-[#ffc480] relative hover:-translate-y-px hover:-translate-x-px">
+                    Architecture
+                </button>
+                <button type="button" data-preset="full-digest" onclick="applyPreset('full-digest')"
+                        class="px-3 py-1 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded transition-colors duration-200 hover:bg-[#ffc480] relative hover:-translate-y-px hover:-translate-x-px">
+                    Full Digest
+                </button>
+            </div>
             <!-- Hidden fields -->
             <input type="hidden" name="pattern_type" value="exclude">
             <input type="hidden" name="pattern" value="">
