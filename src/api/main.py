@@ -64,7 +64,10 @@ async def head_root() -> HTMLResponse:
 
 
 # Include routers for modular endpoints
+# IMPORTANT: summary must be registered BEFORE ingest because ingest has
+# a catch-all route (GET /api/{user}/{repository}) that would otherwise
+# intercept /api/summary/available and /api/chat/stream.
 app.include_router(health)
 app.include_router(index)
-app.include_router(ingest)
 app.include_router(summary)
+app.include_router(ingest)
