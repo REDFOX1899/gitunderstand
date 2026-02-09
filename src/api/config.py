@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     """
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     host: str = "0.0.0.0"  # noqa: S104
     port: int = 8080
