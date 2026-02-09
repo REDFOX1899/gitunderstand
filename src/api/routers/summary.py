@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.config import get_settings
-from api.middleware import limiter
+from api.middleware import check_ai_quota, get_ai_quota_info, limiter, record_ai_usage
 from api.models import ChatRequest, SummaryRequest  # noqa: TC001
 from core.ai_summary import SummaryType, generate_chat_response, generate_summary
 from storage.factory import get_storage
@@ -31,17 +31,16 @@ def _format_sse(event: dict[str, Any]) -> str:
 
 
 @router.get("/api/summary/available")
-async def summary_available() -> JSONResponse:
+async def summary_available(request: Request) -> JSONResponse:
     """Check whether AI summary generation is available.
 
     Returns ``{"available": true}`` when a Claude API key is configured,
-    ``{"available": false}`` otherwise.  The frontend uses this to
-    conditionally show the AI Analysis section.
+    ``{"available": false}`` otherwise.  Also includes usage quota info.
 
     Returns
     -------
     JSONResponse
-        JSON object with ``available`` boolean.
+        JSON object with ``available`` boolean and ``quota`` info.
 
     """
     available = bool(settings.claude_api_key)
@@ -51,7 +50,8 @@ async def summary_available() -> JSONResponse:
             "ENV CLAUDE_API_KEY=%s",
             "SET" if os.environ.get("CLAUDE_API_KEY") else "NOT SET",
         )
-    return JSONResponse({"available": available})
+    quota = get_ai_quota_info(request)
+    return JSONResponse({"available": available, "quota": quota})
 
 
 @router.post("/api/summary/stream")
@@ -104,7 +104,7 @@ async def api_summary_stream(
 
         storage = get_storage()
 
-        # Check cache first
+        # Check cache first (cached results are free — don't count against quota)
         cached_summary = storage.get_summary(digest_id, summary_type.value)
         if cached_summary:
             logger.info("Serving cached %s summary for digest %s", summary_type.value, digest_id)
@@ -114,6 +114,22 @@ async def api_summary_stream(
                     "summary_type": summary_type.value,
                     "content": cached_summary,
                     "cached": True,
+                },
+            })
+            return
+
+        # Check AI usage quota (only for non-cached requests)
+        allowed, _remaining, reset_secs = check_ai_quota(request)
+        if not allowed:
+            minutes = reset_secs // 60
+            yield _format_sse({
+                "type": "error",
+                "payload": {
+                    "message": (
+                        f"Usage limit reached (5 AI requests per 6 hours). "
+                        f"Resets in ~{minutes} minutes. Cached summaries are still available."
+                    ),
+                    "quota_exceeded": True,
                 },
             })
             return
@@ -149,11 +165,19 @@ async def api_summary_stream(
             )
         except (ValueError, RuntimeError) as exc:
             logger.exception("AI summary generation failed for digest %s", digest_id)
+            err_str = str(exc)
+            user_msg = (
+                err_str if "rate limit" in err_str.lower()
+                else "AI generation failed. Please try again later."
+            )
             yield _format_sse({
                 "type": "error",
-                "payload": {"message": f"AI generation failed: {exc}"},
+                "payload": {"message": user_msg},
             })
             return
+
+        # Record AI usage (only after successful generation)
+        record_ai_usage(request)
 
         # Cache the result
         try:
@@ -161,15 +185,16 @@ async def api_summary_stream(
             logger.info("Cached %s summary for digest %s", summary_type.value, digest_id)
         except Exception:
             logger.exception("Failed to cache summary for digest %s", digest_id)
-            # Non-fatal: still return the result
 
-        # Emit complete event
+        # Emit complete event with updated quota
+        quota = get_ai_quota_info(request)
         yield _format_sse({
             "type": "complete",
             "payload": {
                 "summary_type": summary_type.value,
                 "content": result,
                 "cached": False,
+                "quota": quota,
             },
         })
 
@@ -223,6 +248,22 @@ async def api_chat_stream(
             })
             return
 
+        # Check AI usage quota
+        allowed, _remaining, reset_secs = check_ai_quota(request)
+        if not allowed:
+            minutes = reset_secs // 60
+            yield _format_sse({
+                "type": "error",
+                "payload": {
+                    "message": (
+                        f"Usage limit reached (5 AI requests per 6 hours). "
+                        f"Resets in ~{minutes} minutes."
+                    ),
+                    "quota_exceeded": True,
+                },
+            })
+            return
+
         storage = get_storage()
 
         # Emit thinking event
@@ -254,16 +295,25 @@ async def api_chat_stream(
             )
         except (ValueError, RuntimeError) as exc:
             logger.exception("AI chat failed for digest %s", digest_id)
+            err_str = str(exc)
+            user_msg = (
+                err_str if "rate limit" in err_str.lower()
+                else "AI chat failed. Please try again later."
+            )
             yield _format_sse({
                 "type": "error",
-                "payload": {"message": f"AI chat failed: {exc}"},
+                "payload": {"message": user_msg},
             })
             return
 
-        # Emit complete event with the response
+        # Record AI usage
+        record_ai_usage(request)
+
+        # Emit complete event with the response and updated quota
+        quota = get_ai_quota_info(request)
         yield _format_sse({
             "type": "complete",
-            "payload": {"content": result},
+            "payload": {"content": result, "quota": quota},
         })
 
     return StreamingResponse(

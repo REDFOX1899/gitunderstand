@@ -167,10 +167,16 @@ async def clone_repo(config: CloneConfig, *, token: str | None = None) -> None:
                 git_cmd.clone(*cmd_args)
             elif token and is_github_host(url):
                 # For authenticated GitHub repos, use git_cmd with auth URL
-                cmd_args = ["--single-branch", "--no-checkout", "--depth=1", auth_url, local_path]
+                cmd_args = ["--single-branch", "--no-checkout", "--depth=1"]
+                cmd_args.extend([auth_url, local_path])
                 git_cmd.clone(*cmd_args)
             else:
                 # For non-authenticated repos, use the standard GitPython method
+                # Security: disable git hooks to prevent malicious repos from running code
+                clone_kwargs["multi_options"] = [
+                    "-c core.hooksPath=/dev/null",
+                ]
+                clone_kwargs["allow_unsafe_options"] = True
                 git.Repo.clone_from(url, local_path, **clone_kwargs)
 
         logger.info("Git clone completed successfully")

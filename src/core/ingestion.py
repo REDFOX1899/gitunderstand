@@ -235,7 +235,8 @@ def _process_node(
 def _process_symlink(path: Path, parent_node: FileSystemNode, stats: FileSystemStats, local_path: Path) -> None:
     """Process a symlink in the file system.
 
-    This function checks the symlink's target.
+    Symlinks that resolve outside the repository base directory are
+    silently skipped to prevent path traversal attacks.
 
     Parameters
     ----------
@@ -249,6 +250,17 @@ def _process_symlink(path: Path, parent_node: FileSystemNode, stats: FileSystemS
         The base path of the repository or directory being processed.
 
     """
+    # Security: reject symlinks escaping the repository directory
+    try:
+        resolved = path.resolve()
+        base_resolved = local_path.resolve()
+        if not str(resolved).startswith(str(base_resolved) + "/") and resolved != base_resolved:
+            logger.warning("Skipping symlink escaping repo: %s -> %s", path, resolved)
+            return
+    except (OSError, ValueError):
+        logger.debug("Skipping unresolvable symlink: %s", path)
+        return
+
     child = FileSystemNode(
         name=path.name,
         type=FileSystemNodeType.SYMLINK,

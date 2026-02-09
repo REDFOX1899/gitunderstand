@@ -852,6 +852,9 @@ function checkAISummaryAvailable(attempt) {
             // Disable buttons if not available
             _toggleAIButtons(!window._aiAvailable);
 
+            // Update quota display
+            if (data.quota) { _updateQuotaDisplay(data.quota); }
+
             // Setup floating AI button
             _setupAIFloatButton();
 
@@ -880,6 +883,16 @@ function checkAISummaryAvailable(attempt) {
                 }, 2000 * (attempt + 1));
             }
         });
+}
+
+function _updateQuotaDisplay(quota) {
+    var el = document.getElementById('ai-quota-display');
+    if (!el) { return; }
+    var remaining = quota.remaining;
+    var limit = quota.limit;
+    var color = remaining > 2 ? 'text-green-600' : remaining > 0 ? 'text-amber-600' : 'text-red-600';
+    el.innerHTML = '<span class="' + color + ' font-medium">' + remaining + '/' + limit + '</span> AI requests remaining';
+    el.classList.remove('hidden');
 }
 
 function _toggleAIButtons(disabled) {
@@ -1007,6 +1020,9 @@ function handleAISummaryEvent(event) {
             if (cachedBadge) {
                 cachedBadge.classList.toggle('hidden', !payload.cached);
             }
+
+            // Update quota display if returned
+            if (payload.quota) { _updateQuotaDisplay(payload.quota); }
 
             // Store for copy
             window._lastAISummary = payload.content || '';
@@ -1159,6 +1175,9 @@ function _handleChatEvent(event, thinkingId) {
             // Add to history and persist
             window._chatHistory.push({ role: 'assistant', content: content });
             _saveChatHistory();
+
+            // Update quota display
+            if (payload.quota) { _updateQuotaDisplay(payload.quota); }
 
             window._chatBusy = false;
             _setChatInputState(false);

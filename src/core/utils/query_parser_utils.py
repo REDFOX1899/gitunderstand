@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
+import socket
 import string
 from enum import StrEnum
 from typing import TYPE_CHECKING, cast
@@ -158,6 +160,9 @@ def _validate_host(host: str) -> None:
     simple heuristics in ``_looks_like_git_host``, which try to recognise common self-hosted Git services (e.g. GitLab
     instances on sub-domains such as 'gitlab.example.com' or 'git.example.com').
 
+    Also rejects hostnames that resolve to private/internal IP addresses
+    to prevent SSRF attacks.
+
     Parameters
     ----------
     host : str
@@ -166,13 +171,18 @@ def _validate_host(host: str) -> None:
     Raises
     ------
     ValueError
-        If the host cannot be recognised as a probable Git hosting domain.
+        If the host cannot be recognised as a probable Git hosting domain
+        or resolves to a private IP address.
 
     """
     host = host.lower()
     if host not in KNOWN_GIT_HOSTS and not _looks_like_git_host(host):
         msg = f"Unknown domain '{host}' in URL"
         raise ValueError(msg)
+
+    # Security: block SSRF by rejecting hosts that resolve to private IPs
+    if host not in KNOWN_GIT_HOSTS:
+        _reject_private_ip(host)
 
 
 def _looks_like_git_host(host: str) -> bool:
@@ -194,6 +204,43 @@ def _looks_like_git_host(host: str) -> bool:
     """
     host = host.lower()
     return host.startswith(("git.", "gitlab.", "github."))
+
+
+def _reject_private_ip(host: str) -> None:
+    """Reject hostnames that resolve to private or reserved IP addresses.
+
+    Parameters
+    ----------
+    host : str
+        Hostname to check.
+
+    Raises
+    ------
+    ValueError
+        If the host resolves to a private, loopback, or reserved IP.
+
+    """
+    try:
+        addr = ipaddress.ip_address(host)
+        if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local:
+            msg = f"Blocked: '{host}' resolves to a private/reserved address"
+            raise ValueError(msg)
+        return
+    except ValueError as exc:
+        if "resolves to" in str(exc):
+            raise
+        # Not a literal IP — resolve the hostname
+
+    try:
+        results = socket.getaddrinfo(host, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for _family, _type, _proto, _canonname, sockaddr in results:
+            ip_str = sockaddr[0]
+            addr = ipaddress.ip_address(ip_str)
+            if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local:
+                msg = f"Blocked: '{host}' resolves to private address {ip_str}"
+                raise ValueError(msg)
+    except socket.gaierror:
+        pass
 
 
 def _validate_url_scheme(scheme: str) -> None:

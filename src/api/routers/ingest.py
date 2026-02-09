@@ -99,7 +99,8 @@ async def _perform_ingestion(
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=error_response.model_dump())
 
     except Exception as exc:
-        error_response = IngestErrorResponse(error=f"Internal server error: {exc!s}")
+        logger.exception("Internal error during ingestion: %s", exc)
+        error_response = IngestErrorResponse(error="An internal error occurred. Please try again later.")
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=error_response.model_dump())
 
 
