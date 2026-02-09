@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from api.config import get_settings
 from api.middleware import limiter, rate_limit_exception_handler
-from api.routers import health, index, ingest
+from api.routers import health, index, ingest, summary
 
 logger = logging.getLogger(__name__)
 
@@ -67,3 +67,4 @@ async def head_root() -> HTMLResponse:
 app.include_router(health)
 app.include_router(index)
 app.include_router(ingest)
+app.include_router(summary)

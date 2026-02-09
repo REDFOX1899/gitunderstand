@@ -83,7 +83,6 @@ def _store_digest(
         metadata={
             "summary": summary,
             "tree": tree,
-            "content": content,
             "repo_url": str(query.url),
             "user_name": query.user_name,
             "repo_name": query.repo_name,

@@ -3,5 +3,6 @@
 from api.routers.health import router as health
 from api.routers.index import router as index
 from api.routers.ingest import router as ingest
+from api.routers.summary import router as summary
 
-__all__ = ["health", "index", "ingest"]
+__all__ = ["health", "index", "ingest", "summary"]

@@ -98,3 +98,41 @@ class DigestStorage(ABC):
             ``True`` if the digest exists, ``False`` otherwise.
 
         """
+
+    @abstractmethod
+    def store_summary(self, digest_id: str, summary_type: str, content: str) -> str:
+        """Store an AI-generated summary for a digest.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary (e.g. ``"architecture"``, ``"code_review"``).
+        content : str
+            The summary text content to store.
+
+        Returns
+        -------
+        str
+            The storage location of the stored summary.
+
+        """
+
+    @abstractmethod
+    def get_summary(self, digest_id: str, summary_type: str) -> str | None:
+        """Retrieve a cached AI-generated summary.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary to retrieve.
+
+        Returns
+        -------
+        str | None
+            The summary content, or ``None`` if not found.
+
+        """

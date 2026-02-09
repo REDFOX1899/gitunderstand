@@ -174,5 +174,43 @@ class IngestErrorResponse(BaseModel):
     error: str = Field(..., description="Error message")
 
 
+class SummaryRequest(BaseModel):
+    """Request model for the ``/api/summary/stream`` endpoint.
+
+    Attributes
+    ----------
+    digest_id : str
+        Digest ID from a previous ingest.
+    summary_type : str
+        Type of AI summary to generate.
+
+    """
+
+    digest_id: str = Field(..., description="Digest ID from a previous ingest")
+    summary_type: str = Field(
+        default="architecture",
+        description="Summary type: architecture, code_review, onboarding, security",
+    )
+
+
+class SummaryResponse(BaseModel):
+    """Response model for an AI-generated summary.
+
+    Attributes
+    ----------
+    summary_type : str
+        The type of summary that was generated.
+    content : str
+        The generated summary content.
+    cached : bool
+        Whether the result was served from cache.
+
+    """
+
+    summary_type: str = Field(..., description="Type of summary generated")
+    content: str = Field(..., description="Generated summary content")
+    cached: bool = Field(default=False, description="Whether result was from cache")
+
+
 # Union type for API responses
 IngestResponse = IngestSuccessResponse | IngestErrorResponse

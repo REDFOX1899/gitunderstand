@@ -301,6 +301,12 @@ function handleSuccessfulResponse(data) {
     if (btnPlain) { btnPlain.className = btnPlain.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
     if (btnHighlight) { btnHighlight.className = btnHighlight.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
 
+    // Extract digest ID from digest_url for AI summaries
+    window.currentDigestId = data.digest_url ? data.digest_url.split('/').pop() : null;
+
+    // Check AI summary availability
+    checkAISummaryAvailable();
+
     // Scroll to results
     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -811,6 +817,233 @@ function setContentView(mode) {
 }
 
 // ---------------------------------------------------------------------------
+// AI Summary (Phase 7)
+// ---------------------------------------------------------------------------
+
+window.currentDigestId = null;
+
+const AI_TYPE_LABELS = {
+    architecture: 'Architecture Overview',
+    code_review: 'Code Review',
+    onboarding: 'Onboarding Guide',
+    security: 'Security Audit',
+};
+
+function checkAISummaryAvailable() {
+    const section = document.getElementById('ai-analysis-section');
+    if (!section) { return; }
+
+    fetch('/api/summary/available')
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.available) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        })
+        .catch(() => {
+            section.classList.add('hidden');
+        });
+}
+
+function generateAISummary(summaryType) {
+    if (!window.currentDigestId) {
+        showAIError('No digest available. Please ingest a repository first.');
+        return;
+    }
+
+    const loading = document.getElementById('ai-loading');
+    const result = document.getElementById('ai-result');
+    const error = document.getElementById('ai-error');
+    const loadingText = document.getElementById('ai-loading-text');
+
+    // Reset state
+    if (result) { result.classList.add('hidden'); }
+    if (error) { error.classList.add('hidden'); }
+    if (loading) {
+        loading.classList.remove('hidden');
+        if (loadingText) {
+            loadingText.textContent = 'Generating ' + (AI_TYPE_LABELS[summaryType] || summaryType).toLowerCase() + '...';
+        }
+    }
+
+    // Highlight active button
+    document.querySelectorAll('.ai-type-btn').forEach((btn) => {
+        if (btn.dataset.aiType === summaryType) {
+            btn.classList.remove('bg-[#E8F0FE]');
+            btn.classList.add('bg-[#ffc480]');
+        } else {
+            btn.classList.remove('bg-[#ffc480]');
+            btn.classList.add('bg-[#E8F0FE]');
+        }
+    });
+
+    // SSE stream for summary generation
+    fetch('/api/summary/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            digest_id: window.currentDigestId,
+            summary_type: summaryType,
+        }),
+    })
+        .then(async (response) => {
+            if (!response.ok) {
+                let data;
+                try { data = await response.json(); } catch { data = {}; }
+                showAIError(data.error || data.detail || 'Request failed');
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) { break; }
+
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop();
+
+                for (const eventStr of events) {
+                    if (!eventStr.trim()) { continue; }
+                    const lines = eventStr.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const sseEvent = JSON.parse(line.slice(6));
+                                handleAISummaryEvent(sseEvent);
+                            } catch (e) {
+                                console.error('Failed to parse AI SSE event:', e, line);
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .catch((err) => {
+            showAIError('Network error: ' + err.message);
+        });
+}
+
+function handleAISummaryEvent(event) {
+    const { type, payload } = event;
+    const loading = document.getElementById('ai-loading');
+    const loadingText = document.getElementById('ai-loading-text');
+
+    switch (type) {
+        case 'generating':
+            if (loadingText) {
+                loadingText.textContent = payload.message || 'Generating...';
+            }
+            break;
+
+        case 'complete': {
+            if (loading) { loading.classList.add('hidden'); }
+
+            const result = document.getElementById('ai-result');
+            const resultType = document.getElementById('ai-result-type');
+            const resultContent = document.getElementById('ai-result-content');
+            const cachedBadge = document.getElementById('ai-cached-badge');
+
+            if (result) { result.classList.remove('hidden'); }
+            if (resultType) {
+                resultType.textContent = AI_TYPE_LABELS[payload.summary_type] || payload.summary_type;
+            }
+            if (resultContent) {
+                renderMarkdownContent(payload.content, resultContent);
+            }
+            if (cachedBadge) {
+                cachedBadge.classList.toggle('hidden', !payload.cached);
+            }
+
+            // Store for copy
+            window._lastAISummary = payload.content || '';
+            break;
+        }
+
+        case 'error':
+            if (loading) { loading.classList.add('hidden'); }
+            showAIError(payload.message || 'An error occurred during AI analysis.');
+            break;
+
+        default:
+            console.warn('Unknown AI SSE event type:', type);
+    }
+}
+
+function showAIError(message) {
+    const loading = document.getElementById('ai-loading');
+    const error = document.getElementById('ai-error');
+    const errorContent = document.getElementById('ai-error-content');
+
+    if (loading) { loading.classList.add('hidden'); }
+    if (error) { error.classList.remove('hidden'); }
+    if (errorContent) { errorContent.textContent = message; }
+}
+
+function copyAISummary() {
+    const text = window._lastAISummary || '';
+    if (!text) { return; }
+
+    const button = document.querySelector('[onclick="copyAISummary()"]');
+    if (!button) { return; }
+
+    const original = button.textContent;
+    navigator.clipboard.writeText(text)
+        .then(() => {
+            button.textContent = 'Copied!';
+            setTimeout(() => { button.textContent = original; }, 1000);
+        })
+        .catch(() => {
+            button.textContent = 'Failed';
+            setTimeout(() => { button.textContent = original; }, 1000);
+        });
+}
+
+function renderMarkdownContent(markdown, container) {
+    if (!container || !markdown) { return; }
+
+    // Simple markdown-to-HTML conversion for AI output
+    let html = markdown
+        // Escape HTML entities
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        // Code blocks (must come before inline code)
+        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto my-2"><code>$2</code></pre>')
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-xs">$1</code>')
+        // Headers
+        .replace(/^#### (.+)$/gm, '<h4 class="font-bold text-sm mt-3 mb-1">$1</h4>')
+        .replace(/^### (.+)$/gm, '<h3 class="font-bold text-base mt-4 mb-1">$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2 class="font-bold text-lg mt-4 mb-2">$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1 class="font-bold text-xl mt-4 mb-2">$1</h1>')
+        // Bold and italic
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Unordered lists
+        .replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>')
+        .replace(/^  - (.+)$/gm, '<li class="ml-8">$1</li>')
+        // Ordered lists
+        .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
+        // Horizontal rule
+        .replace(/^---$/gm, '<hr class="my-3 border-gray-300">')
+        // Line breaks (double newlines become paragraphs)
+        .replace(/\n\n/g, '</p><p class="my-2">')
+        .replace(/\n/g, '<br>');
+
+    // Wrap in paragraph if not already wrapped
+    html = '<p class="my-2">' + html + '</p>';
+
+    container.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
 // Form submission
 // ---------------------------------------------------------------------------
 
@@ -1123,3 +1356,6 @@ window.expandAllTree = expandAllTree;
 window.collapseAllTree = collapseAllTree;
 window.setContentView = setContentView;
 window.copySingleFile = copySingleFile;
+// Phase 7: AI summaries
+window.generateAISummary = generateAISummary;
+window.copyAISummary = copyAISummary;

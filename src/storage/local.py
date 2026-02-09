@@ -181,3 +181,48 @@ class LocalStorage(DigestStorage):
 
         """
         return self._digest_file(digest_id).exists()
+
+    def store_summary(self, digest_id: str, summary_type: str, content: str) -> str:
+        """Store an AI-generated summary to the local filesystem.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary (e.g. ``"architecture"``).
+        content : str
+            The summary text content to store.
+
+        Returns
+        -------
+        str
+            The file path of the stored summary.
+
+        """
+        summary_file = self._digest_dir(digest_id) / f"summary_{summary_type}.txt"
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        summary_file.write_text(content, encoding="utf-8")
+        logger.info("Stored summary at %s", summary_file)
+        return str(summary_file)
+
+    def get_summary(self, digest_id: str, summary_type: str) -> str | None:
+        """Retrieve a cached AI-generated summary from the local filesystem.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary to retrieve.
+
+        Returns
+        -------
+        str | None
+            The summary content, or ``None`` if not found.
+
+        """
+        summary_file = self._digest_dir(digest_id) / f"summary_{summary_type}.txt"
+        if not summary_file.exists():
+            return None
+        return summary_file.read_text(encoding="utf-8")

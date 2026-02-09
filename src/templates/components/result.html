@@ -171,6 +171,68 @@
                          style="min-height: 600px; max-height: 80vh;">
                     </div>
                 </div>
+                <!-- AI Analysis Section (hidden until availability check) -->
+                <div id="ai-analysis-section" class="mt-6 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-900">AI Analysis</h3>
+                        <span class="text-xs text-gray-400">Powered by Gemini</span>
+                    </div>
+                    <!-- Summary type buttons -->
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button type="button" onclick="generateAISummary('architecture')" data-ai-type="architecture"
+                                class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
+                            Architecture Overview
+                        </button>
+                        <button type="button" onclick="generateAISummary('code_review')" data-ai-type="code_review"
+                                class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
+                            Code Review
+                        </button>
+                        <button type="button" onclick="generateAISummary('onboarding')" data-ai-type="onboarding"
+                                class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
+                            Onboarding Guide
+                        </button>
+                        <button type="button" onclick="generateAISummary('security')" data-ai-type="security"
+                                class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
+                            Security Audit
+                        </button>
+                    </div>
+                    <!-- AI Loading indicator (hidden by default) -->
+                    <div id="ai-loading" class="hidden">
+                        <div class="relative">
+                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div class="bg-[#fafafa] rounded border-[3px] border-gray-900 p-4 relative z-10 flex items-center gap-3">
+                                <div class="animate-spin h-5 w-5 border-[3px] border-gray-900 border-t-transparent rounded-full"></div>
+                                <span id="ai-loading-text" class="text-sm font-medium">Generating analysis...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- AI Result (hidden by default) -->
+                    <div id="ai-result" class="hidden">
+                        <div class="relative">
+                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div class="bg-[#fff4da] border-[3px] border-gray-900 rounded p-4 relative z-10">
+                                <div class="flex justify-between items-center mb-3">
+                                    <span id="ai-result-type" class="text-sm font-bold text-gray-700"></span>
+                                    <div class="flex items-center gap-2">
+                                        <span id="ai-cached-badge" class="hidden text-xs px-2 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded-full">Cached</span>
+                                        <button type="button" onclick="copyAISummary()"
+                                                class="px-3 py-1 text-xs bg-[#ffc480] border-[2px] border-gray-900 rounded hover:opacity-80 transition-opacity font-medium">
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="ai-result-content" class="prose prose-sm max-w-none font-mono text-sm whitespace-pre-wrap leading-relaxed"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- AI Error (hidden by default) -->
+                    <div id="ai-error" class="hidden">
+                        <div class="relative">
+                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div id="ai-error-content" class="bg-red-50 border-[3px] border-red-400 rounded p-4 text-red-700 text-sm relative z-10"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

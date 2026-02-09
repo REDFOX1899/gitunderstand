@@ -160,3 +160,47 @@ class GCSStorage(DigestStorage):
 
         """
         return self._bucket.blob(self._blob_path(digest_id, "digest.txt")).exists()
+
+    def store_summary(self, digest_id: str, summary_type: str, content: str) -> str:
+        """Store an AI-generated summary to Google Cloud Storage.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary (e.g. ``"architecture"``).
+        content : str
+            The summary text content to store.
+
+        Returns
+        -------
+        str
+            The GCS URI of the stored summary.
+
+        """
+        blob = self._bucket.blob(self._blob_path(digest_id, f"summary_{summary_type}.txt"))
+        blob.upload_from_string(content, content_type="text/plain")
+        logger.info("Stored summary at gs://%s/%s", self._bucket_name, blob.name)
+        return f"gs://{self._bucket_name}/{blob.name}"
+
+    def get_summary(self, digest_id: str, summary_type: str) -> str | None:
+        """Retrieve a cached AI-generated summary from Google Cloud Storage.
+
+        Parameters
+        ----------
+        digest_id : str
+            Unique identifier for the digest.
+        summary_type : str
+            The type of summary to retrieve.
+
+        Returns
+        -------
+        str | None
+            The summary content, or ``None`` if not found.
+
+        """
+        blob = self._bucket.blob(self._blob_path(digest_id, f"summary_{summary_type}.txt"))
+        if not blob.exists():
+            return None
+        return blob.download_as_text(encoding="utf-8")
