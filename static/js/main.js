@@ -817,10 +817,13 @@ function setContentView(mode) {
 }
 
 // ---------------------------------------------------------------------------
-// AI Summary (Phase 7)
+// AI Summary & Chat (Phase 7)
 // ---------------------------------------------------------------------------
 
 window.currentDigestId = null;
+window._aiAvailable = false;
+window._chatHistory = [];
+window._chatBusy = false;
 
 const AI_TYPE_LABELS = {
     architecture: 'Architecture Overview',
@@ -833,21 +836,85 @@ function checkAISummaryAvailable() {
     const section = document.getElementById('ai-analysis-section');
     if (!section) { return; }
 
+    // Always show the AI section after ingest
+    section.classList.remove('hidden');
+
     fetch('/api/summary/available')
         .then((r) => r.json())
         .then((data) => {
-            if (data.available) {
-                section.classList.remove('hidden');
-            } else {
-                section.classList.add('hidden');
+            window._aiAvailable = !!data.available;
+            const notice = document.getElementById('ai-not-configured');
+            if (notice) {
+                notice.classList.toggle('hidden', window._aiAvailable);
             }
+            // Disable buttons if not available
+            _toggleAIButtons(!window._aiAvailable);
         })
         .catch(() => {
-            section.classList.add('hidden');
+            window._aiAvailable = false;
+            const notice = document.getElementById('ai-not-configured');
+            if (notice) { notice.classList.remove('hidden'); }
+            _toggleAIButtons(true);
         });
 }
 
+function _toggleAIButtons(disabled) {
+    document.querySelectorAll('.ai-type-btn').forEach((btn) => {
+        btn.disabled = disabled;
+        if (disabled) {
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    });
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send-btn');
+    if (chatInput) { chatInput.disabled = disabled; }
+    if (chatSend) {
+        chatSend.disabled = disabled;
+        if (disabled) {
+            chatSend.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            chatSend.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab switching between Summaries and Chat
+// ---------------------------------------------------------------------------
+
+function switchAITab(tab) {
+    const summariesPanel = document.getElementById('ai-summaries-panel');
+    const chatPanel = document.getElementById('ai-chat-panel');
+    const tabSummaries = document.getElementById('ai-tab-summaries');
+    const tabChat = document.getElementById('ai-tab-chat');
+
+    if (tab === 'chat') {
+        if (summariesPanel) { summariesPanel.classList.add('hidden'); }
+        if (chatPanel) { chatPanel.classList.remove('hidden'); }
+        if (tabSummaries) { tabSummaries.className = tabSummaries.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+        if (tabChat) { tabChat.className = tabChat.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+        // Focus chat input
+        const input = document.getElementById('chat-input');
+        if (input) { setTimeout(() => input.focus(), 100); }
+    } else {
+        if (summariesPanel) { summariesPanel.classList.remove('hidden'); }
+        if (chatPanel) { chatPanel.classList.add('hidden'); }
+        if (tabSummaries) { tabSummaries.className = tabSummaries.className.replace('bg-[#E8F0FE]', 'bg-[#ffc480]'); }
+        if (tabChat) { tabChat.className = tabChat.className.replace('bg-[#ffc480]', 'bg-[#E8F0FE]'); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Summary generation (existing, refined)
+// ---------------------------------------------------------------------------
+
 function generateAISummary(summaryType) {
+    if (!window._aiAvailable) {
+        showAIError('AI features are not configured. Set GEMINI_API_KEY to enable.');
+        return;
+    }
     if (!window.currentDigestId) {
         showAIError('No digest available. Please ingest a repository first.');
         return;
@@ -880,53 +947,10 @@ function generateAISummary(summaryType) {
     });
 
     // SSE stream for summary generation
-    fetch('/api/summary/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            digest_id: window.currentDigestId,
-            summary_type: summaryType,
-        }),
-    })
-        .then(async (response) => {
-            if (!response.ok) {
-                let data;
-                try { data = await response.json(); } catch { data = {}; }
-                showAIError(data.error || data.detail || 'Request failed');
-                return;
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) { break; }
-
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split('\n\n');
-                buffer = events.pop();
-
-                for (const eventStr of events) {
-                    if (!eventStr.trim()) { continue; }
-                    const lines = eventStr.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const sseEvent = JSON.parse(line.slice(6));
-                                handleAISummaryEvent(sseEvent);
-                            } catch (e) {
-                                console.error('Failed to parse AI SSE event:', e, line);
-                            }
-                        }
-                    }
-                }
-            }
-        })
-        .catch((err) => {
-            showAIError('Network error: ' + err.message);
-        });
+    _readSSEStream('/api/summary/stream', {
+        digest_id: window.currentDigestId,
+        summary_type: summaryType,
+    }, handleAISummaryEvent, (err) => showAIError('Network error: ' + err.message));
 }
 
 function handleAISummaryEvent(event) {
@@ -1004,6 +1028,286 @@ function copyAISummary() {
         });
 }
 
+// ---------------------------------------------------------------------------
+// Chat functionality
+// ---------------------------------------------------------------------------
+
+function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input) { return; }
+
+    const message = input.value.trim();
+    if (!message) { return; }
+    if (window._chatBusy) { return; }
+
+    if (!window._aiAvailable) {
+        _appendChatError('AI features are not configured. Set GEMINI_API_KEY to enable.');
+        return;
+    }
+    if (!window.currentDigestId) {
+        _appendChatError('No digest available. Please ingest a repository first.');
+        return;
+    }
+
+    // Clear input
+    input.value = '';
+
+    // Hide suggestions after first message
+    const suggestions = document.getElementById('chat-suggestions');
+    if (suggestions) { suggestions.classList.add('hidden'); }
+
+    // Add user message to UI
+    _appendChatMessage('user', message);
+
+    // Add to history
+    window._chatHistory.push({ role: 'user', content: message });
+
+    // Show thinking indicator
+    const thinkingId = _appendChatThinking();
+
+    // Mark busy
+    window._chatBusy = true;
+    _setChatInputState(true);
+
+    // Send to API
+    _readSSEStream('/api/chat/stream', {
+        digest_id: window.currentDigestId,
+        message: message,
+        history: window._chatHistory.slice(0, -1), // Send all except the latest (which is the current message)
+    }, (event) => {
+        _handleChatEvent(event, thinkingId);
+    }, (err) => {
+        _removeChatThinking(thinkingId);
+        _appendChatError('Network error: ' + err.message);
+        window._chatBusy = false;
+        _setChatInputState(false);
+    });
+}
+
+function askQuickQuestion(question) {
+    const input = document.getElementById('chat-input');
+    if (input) { input.value = question; }
+    // Switch to chat tab first
+    switchAITab('chat');
+    sendChatMessage();
+}
+
+function clearChat() {
+    window._chatHistory = [];
+    const container = document.getElementById('chat-messages');
+    if (!container) { return; }
+
+    // Reset to welcome message
+    container.innerHTML = '';
+    const welcome = document.createElement('div');
+    welcome.className = 'chat-msg-assistant flex gap-3';
+    welcome.innerHTML = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>'
+        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]">'
+        + '<p class="text-sm text-gray-800">Hi! I can answer questions about this repository. Ask me anything about the code, architecture, bugs, or best practices.</p>'
+        + '</div>';
+    container.appendChild(welcome);
+
+    // Show suggestions again
+    const suggestions = document.getElementById('chat-suggestions');
+    if (suggestions) { suggestions.classList.remove('hidden'); }
+}
+
+function _handleChatEvent(event, thinkingId) {
+    const { type, payload } = event;
+
+    switch (type) {
+        case 'thinking':
+            // Already showing thinking indicator
+            break;
+
+        case 'complete': {
+            _removeChatThinking(thinkingId);
+            const content = payload.content || '';
+            _appendChatMessage('assistant', content);
+
+            // Add to history
+            window._chatHistory.push({ role: 'assistant', content: content });
+
+            window._chatBusy = false;
+            _setChatInputState(false);
+
+            // Focus input for next message
+            const input = document.getElementById('chat-input');
+            if (input) { input.focus(); }
+            break;
+        }
+
+        case 'error':
+            _removeChatThinking(thinkingId);
+            _appendChatError(payload.message || 'An error occurred.');
+            window._chatBusy = false;
+            _setChatInputState(false);
+            break;
+
+        default:
+            console.warn('Unknown chat SSE event type:', type);
+    }
+}
+
+function _appendChatMessage(role, content) {
+    const container = document.getElementById('chat-messages');
+    if (!container) { return; }
+
+    const wrapper = document.createElement('div');
+
+    if (role === 'user') {
+        wrapper.className = 'chat-msg-user flex gap-3 justify-end';
+        wrapper.innerHTML = '<div class="bg-[#E8F0FE] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]">'
+            + '<p class="text-sm text-gray-800 whitespace-pre-wrap">' + _escapeHtml(content) + '</p>'
+            + '</div>'
+            + '<div class="w-7 h-7 rounded-full bg-[#E8F0FE] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">You</div>';
+    } else {
+        wrapper.className = 'chat-msg-assistant flex gap-3';
+        const avatar = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>';
+        const bubble = document.createElement('div');
+        bubble.className = 'bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'text-sm leading-relaxed';
+        renderMarkdownContent(content, contentDiv);
+        bubble.appendChild(contentDiv);
+
+        // Copy button for assistant messages
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors';
+        copyBtn.textContent = 'Copy';
+        copyBtn.onclick = function () {
+            navigator.clipboard.writeText(content).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1000);
+            });
+        };
+        bubble.appendChild(copyBtn);
+
+        wrapper.innerHTML = avatar;
+        wrapper.appendChild(bubble);
+    }
+
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+}
+
+function _appendChatThinking() {
+    const container = document.getElementById('chat-messages');
+    if (!container) { return null; }
+
+    const id = 'thinking-' + Date.now();
+    const wrapper = document.createElement('div');
+    wrapper.id = id;
+    wrapper.className = 'chat-msg-assistant flex gap-3';
+    wrapper.innerHTML = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>'
+        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 flex items-center gap-2">'
+        + '<div class="flex gap-1"><span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>'
+        + '<span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>'
+        + '<span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span></div>'
+        + '<span class="text-xs text-gray-400 ml-1">Thinking...</span></div>';
+
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+    return id;
+}
+
+function _removeChatThinking(id) {
+    if (!id) { return; }
+    const el = document.getElementById(id);
+    if (el) { el.remove(); }
+}
+
+function _appendChatError(message) {
+    const container = document.getElementById('chat-messages');
+    if (!container) { return; }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-msg-error flex gap-3';
+    wrapper.innerHTML = '<div class="w-7 h-7 rounded-full bg-red-100 border-[2px] border-red-400 flex items-center justify-center flex-shrink-0 text-xs">!</div>'
+        + '<div class="bg-red-50 border-[2px] border-red-300 rounded-lg p-3 max-w-[85%]">'
+        + '<p class="text-sm text-red-700">' + _escapeHtml(message) + '</p></div>';
+
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+}
+
+function _setChatInputState(busy) {
+    const input = document.getElementById('chat-input');
+    const btn = document.getElementById('chat-send-btn');
+    if (input) {
+        input.disabled = busy;
+        input.placeholder = busy ? 'Waiting for response...' : 'Ask about this codebase...';
+    }
+    if (btn) {
+        btn.disabled = busy;
+        if (busy) {
+            btn.classList.add('opacity-50');
+        } else {
+            btn.classList.remove('opacity-50');
+        }
+    }
+}
+
+function _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Shared SSE reader
+// ---------------------------------------------------------------------------
+
+function _readSSEStream(url, body, onEvent, onError) {
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+        .then(async (response) => {
+            if (!response.ok) {
+                let data;
+                try { data = await response.json(); } catch { data = {}; }
+                onEvent({ type: 'error', payload: { message: data.error || data.detail || 'Request failed' } });
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) { break; }
+
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop();
+
+                for (const eventStr of events) {
+                    if (!eventStr.trim()) { continue; }
+                    const lines = eventStr.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const sseEvent = JSON.parse(line.slice(6));
+                                onEvent(sseEvent);
+                            } catch (e) {
+                                console.error('Failed to parse SSE event:', e, line);
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .catch(onError);
+}
+
+// ---------------------------------------------------------------------------
+// Markdown renderer (shared between summaries and chat)
+// ---------------------------------------------------------------------------
+
 function renderMarkdownContent(markdown, container) {
     if (!container || !markdown) { return; }
 
@@ -1014,9 +1318,9 @@ function renderMarkdownContent(markdown, container) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         // Code blocks (must come before inline code)
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto my-2"><code>$2</code></pre>')
+        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto my-2 font-mono"><code>$2</code></pre>')
         // Inline code
-        .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-xs">$1</code>')
+        .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-xs font-mono">$1</code>')
         // Headers
         .replace(/^#### (.+)$/gm, '<h4 class="font-bold text-sm mt-3 mb-1">$1</h4>')
         .replace(/^### (.+)$/gm, '<h3 class="font-bold text-base mt-4 mb-1">$1</h3>')
@@ -1356,6 +1660,10 @@ window.expandAllTree = expandAllTree;
 window.collapseAllTree = collapseAllTree;
 window.setContentView = setContentView;
 window.copySingleFile = copySingleFile;
-// Phase 7: AI summaries
+// Phase 7: AI summaries + chat
 window.generateAISummary = generateAISummary;
 window.copyAISummary = copyAISummary;
+window.switchAITab = switchAITab;
+window.sendChatMessage = sendChatMessage;
+window.askQuickQuestion = askQuickQuestion;
+window.clearChat = clearChat;

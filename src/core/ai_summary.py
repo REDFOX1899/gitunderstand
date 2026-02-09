@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 # Maximum characters to send to Gemini (leave room for prompt within 2M context)
 MAX_CONTENT_CHARS = 1_500_000
 
+# Maximum characters for chat context (smaller to leave room for conversation history)
+MAX_CHAT_CONTEXT_CHARS = 500_000
+
 
 class SummaryType(StrEnum):
     """Types of AI-generated repository summaries."""
@@ -136,4 +139,100 @@ async def generate_summary(
         raise RuntimeError(msg) from exc
 
     logger.info("Generated %s summary (%d chars)", summary_type.value, len(result))
+    return result
+
+
+async def generate_chat_response(
+    api_key: str,
+    tree: str,
+    content: str,
+    message: str,
+    history: list[dict[str, str]] | None = None,
+) -> str:
+    """Generate a conversational AI response about a repository.
+
+    Parameters
+    ----------
+    api_key : str
+        Google Gemini API key.
+    tree : str
+        The directory tree structure of the repository.
+    content : str
+        The concatenated file contents of the repository.
+    message : str
+        The user's question or message.
+    history : list[dict[str, str]] | None
+        Previous conversation history as a list of ``{"role": ..., "content": ...}``
+        dicts.  Roles are ``"user"`` and ``"assistant"``.
+
+    Returns
+    -------
+    str
+        The AI's response in markdown format.
+
+    Raises
+    ------
+    ValueError
+        If the API key is empty.
+    RuntimeError
+        If the Gemini API call fails.
+
+    """
+    if not api_key:
+        msg = "Gemini API key is not configured"
+        raise ValueError(msg)
+
+    # Truncate content if too large (smaller limit for chat to leave room for history)
+    if len(content) > MAX_CHAT_CONTEXT_CHARS:
+        content = content[:MAX_CHAT_CONTEXT_CHARS] + "\n\n... (content truncated for context limit)"
+        logger.info("Truncated chat context to %d chars", MAX_CHAT_CONTEXT_CHARS)
+
+    # Configure the API
+    genai.configure(api_key=api_key)
+
+    # Build the system context
+    system_context = (
+        "You are an expert software engineer acting as a helpful AI assistant "
+        "that has deep knowledge of a specific code repository. You can answer "
+        "questions about the code, architecture, bugs, best practices, and anything "
+        "else related to this codebase.\n\n"
+        "Be concise but thorough. Use markdown formatting. When referencing code, "
+        "mention specific file paths. If you're unsure about something, say so.\n\n"
+        f"## Directory Structure\n```\n{tree}\n```\n\n"
+        f"## File Contents\n{content}"
+    )
+
+    # Build conversation parts for Gemini
+    # Gemini uses a list of Content objects with roles "user" and "model"
+    conversation_parts = []
+
+    # First message includes system context
+    if history:
+        # Prepend system context to the first user message in history
+        for i, msg_item in enumerate(history):
+            role = "model" if msg_item["role"] == "assistant" else "user"
+            text = msg_item["content"]
+            if i == 0 and role == "user":
+                text = system_context + "\n\n---\n\nUser question: " + text
+            conversation_parts.append({"role": role, "parts": [text]})
+
+        # Add current message
+        conversation_parts.append({"role": "user", "parts": [message]})
+    else:
+        # No history — single message with context
+        conversation_parts.append({
+            "role": "user",
+            "parts": [system_context + "\n\n---\n\nUser question: " + message],
+        })
+
+    try:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = await model.generate_content_async(conversation_parts)
+        result = response.text
+    except Exception as exc:
+        logger.exception("Gemini chat API call failed")
+        msg = f"AI chat failed: {exc}"
+        raise RuntimeError(msg) from exc
+
+    logger.info("Generated chat response (%d chars)", len(result))
     return result

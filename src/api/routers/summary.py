@@ -1,4 +1,4 @@
-"""AI summary endpoints for the GitUnderstand API."""
+"""AI summary and chat endpoints for the GitUnderstand API."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.config import get_settings
 from api.middleware import limiter
-from api.models import SummaryRequest  # noqa: TC001
-from core.ai_summary import SummaryType, generate_summary
+from api.models import ChatRequest, SummaryRequest  # noqa: TC001
+from core.ai_summary import SummaryType, generate_chat_response, generate_summary
 from storage.factory import get_storage
 
 if TYPE_CHECKING:
@@ -163,6 +163,99 @@ async def api_summary_stream(
                 "content": result,
                 "cached": False,
             },
+        })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/api/chat/stream")
+@limiter.limit("15/minute")
+async def api_chat_stream(
+    request: Request,
+    chat_request: ChatRequest,
+) -> StreamingResponse:
+    """Stream AI chat response as Server-Sent Events.
+
+    Accepts a user message and optional conversation history,
+    retrieves the digest context, and generates a conversational
+    response using Gemini.
+
+    Parameters
+    ----------
+    request : Request
+        The incoming HTTP request (used by rate limiter).
+    chat_request : ChatRequest
+        Request body with ``digest_id``, ``message``, and ``history``.
+
+    Returns
+    -------
+    StreamingResponse
+        SSE stream with the chat response.
+
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        digest_id = chat_request.digest_id
+        message = chat_request.message
+        history = [{"role": m.role, "content": m.content} for m in chat_request.history]
+
+        # Check API key
+        if not settings.gemini_api_key:
+            yield _format_sse({
+                "type": "error",
+                "payload": {"message": "AI chat is not configured (missing API key)"},
+            })
+            return
+
+        storage = get_storage()
+
+        # Emit thinking event
+        yield _format_sse({
+            "type": "thinking",
+            "payload": {"message": "Analyzing repository and thinking..."},
+        })
+
+        # Retrieve digest content + metadata
+        digest_content = storage.get_digest(digest_id)
+        if not digest_content:
+            yield _format_sse({
+                "type": "error",
+                "payload": {"message": f"Digest not found: {digest_id}"},
+            })
+            return
+
+        metadata = storage.get_metadata(digest_id)
+        tree = metadata.get("tree", "") if metadata else ""
+
+        # Generate chat response via Gemini
+        try:
+            result = await generate_chat_response(
+                api_key=settings.gemini_api_key,
+                tree=tree,
+                content=digest_content,
+                message=message,
+                history=history,
+            )
+        except (ValueError, RuntimeError) as exc:
+            logger.exception("AI chat failed for digest %s", digest_id)
+            yield _format_sse({
+                "type": "error",
+                "payload": {"message": f"AI chat failed: {exc}"},
+            })
+            return
+
+        # Emit complete event with the response
+        yield _format_sse({
+            "type": "complete",
+            "payload": {"content": result},
         })
 
     return StreamingResponse(

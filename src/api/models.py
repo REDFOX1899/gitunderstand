@@ -212,5 +212,43 @@ class SummaryResponse(BaseModel):
     cached: bool = Field(default=False, description="Whether result was from cache")
 
 
+class ChatMessage(BaseModel):
+    """A single message in a chat conversation.
+
+    Attributes
+    ----------
+    role : str
+        Either ``"user"`` or ``"assistant"``.
+    content : str
+        The message content.
+
+    """
+
+    role: str = Field(..., description="Message role: user or assistant")
+    content: str = Field(..., description="Message content")
+
+
+class ChatRequest(BaseModel):
+    """Request model for the ``/api/chat/stream`` endpoint.
+
+    Attributes
+    ----------
+    digest_id : str
+        Digest ID from a previous ingest.
+    message : str
+        The user's message/question.
+    history : list[ChatMessage]
+        Previous conversation history.
+
+    """
+
+    digest_id: str = Field(..., description="Digest ID from a previous ingest")
+    message: str = Field(..., min_length=1, max_length=5000, description="User's message")
+    history: list[ChatMessage] = Field(
+        default_factory=list,
+        description="Previous conversation messages",
+    )
+
+
 # Union type for API responses
 IngestResponse = IngestSuccessResponse | IngestErrorResponse
