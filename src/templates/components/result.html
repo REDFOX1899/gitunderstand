@@ -177,78 +177,102 @@
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-1">
                             <h3 class="text-lg font-bold text-gray-900 mr-3">AI Analysis</h3>
-                            <div class="flex border-[3px] border-gray-900 rounded overflow-hidden">
+                            <div class="flex border-[3px] border-gray-900 rounded-lg overflow-hidden">
                                 <button type="button" onclick="switchAITab('summaries')" id="ai-tab-summaries"
+                                        aria-label="Switch to Summaries tab"
                                         class="px-4 py-1.5 text-sm font-bold bg-[#ffc480] border-r-[3px] border-gray-900 transition-colors">
                                     Summaries
                                 </button>
                                 <button type="button" onclick="switchAITab('chat')" id="ai-tab-chat"
+                                        aria-label="Switch to Chat tab"
                                         class="px-4 py-1.5 text-sm font-bold bg-[#E8F0FE] transition-colors">
                                     Chat
                                 </button>
                             </div>
                         </div>
-                        <span class="text-xs text-gray-400">Powered by Claude</span>
+                        <span class="text-xs text-gray-400 font-medium tracking-wide">Powered by Claude</span>
                     </div>
 
-                    <!-- Not configured notice -->
+                    <!-- Not configured notice (with retry) -->
                     <div id="ai-not-configured" class="hidden mb-4">
                         <div class="relative">
-                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                            <div class="bg-[#fff4da] border-[3px] border-gray-900 rounded p-4 relative z-10 flex items-center gap-3">
-                                <svg class="w-5 h-5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-800">AI features require a Claude API key</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">Set <code class="bg-gray-200 px-1 rounded">CLAUDE_API_KEY</code> in your environment to enable AI analysis and chat.</p>
+                            <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div class="bg-[#fff4da] border-[3px] border-gray-900 rounded-lg p-4 relative z-10 flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-800">AI features are connecting...</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">If this persists, ensure <code class="bg-gray-200 px-1 rounded font-mono text-[11px]">CLAUDE_API_KEY</code> is configured.</p>
+                                    </div>
                                 </div>
+                                <button type="button" onclick="checkAISummaryAvailable(0)"
+                                        class="px-3 py-1.5 text-xs bg-[#ffc480] border-[2px] border-gray-900 rounded-lg hover:bg-[#ffb14d] transition-colors font-bold flex-shrink-0">
+                                    Retry
+                                </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- ==================== SUMMARIES TAB ==================== -->
                     <div id="ai-summaries-panel">
-                        <!-- Summary type buttons -->
-                        <div class="flex flex-wrap gap-2 mb-4">
+                        <!-- Summary type buttons (2x2 grid with descriptions) -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                             <button type="button" onclick="generateAISummary('architecture')" data-ai-type="architecture"
-                                    class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
-                                Architecture Overview
+                                    aria-label="Generate Architecture Overview summary"
+                                    class="ai-type-btn px-3 py-3 text-left bg-[#E8F0FE] border-[3px] border-gray-900 rounded-lg hover:bg-[#ffc480] transition-colors">
+                                <span class="text-sm font-bold block">Architecture</span>
+                                <span class="text-[10px] text-gray-500 block mt-0.5">System design &amp; data flow</span>
                             </button>
                             <button type="button" onclick="generateAISummary('code_review')" data-ai-type="code_review"
-                                    class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
-                                Code Review
+                                    aria-label="Generate Code Review summary"
+                                    class="ai-type-btn px-3 py-3 text-left bg-[#E8F0FE] border-[3px] border-gray-900 rounded-lg hover:bg-[#ffc480] transition-colors">
+                                <span class="text-sm font-bold block">Code Review</span>
+                                <span class="text-[10px] text-gray-500 block mt-0.5">Quality issues &amp; improvements</span>
                             </button>
                             <button type="button" onclick="generateAISummary('onboarding')" data-ai-type="onboarding"
-                                    class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
-                                Onboarding Guide
+                                    aria-label="Generate Onboarding Guide summary"
+                                    class="ai-type-btn px-3 py-3 text-left bg-[#E8F0FE] border-[3px] border-gray-900 rounded-lg hover:bg-[#ffc480] transition-colors">
+                                <span class="text-sm font-bold block">Onboarding</span>
+                                <span class="text-[10px] text-gray-500 block mt-0.5">Setup &amp; dev guide</span>
                             </button>
                             <button type="button" onclick="generateAISummary('security')" data-ai-type="security"
-                                    class="ai-type-btn px-4 py-2 text-sm bg-[#E8F0FE] border-[3px] border-gray-900 rounded hover:bg-[#ffc480] transition-colors font-medium">
-                                Security Audit
+                                    aria-label="Generate Security Audit summary"
+                                    class="ai-type-btn px-3 py-3 text-left bg-[#E8F0FE] border-[3px] border-gray-900 rounded-lg hover:bg-[#ffc480] transition-colors">
+                                <span class="text-sm font-bold block">Security</span>
+                                <span class="text-[10px] text-gray-500 block mt-0.5">Vulnerabilities &amp; audit</span>
                             </button>
                         </div>
-                        <!-- AI Loading indicator (hidden by default) -->
+                        <!-- AI Loading indicator with skeleton shimmer -->
                         <div id="ai-loading" class="hidden">
                             <div class="relative">
-                                <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                                <div class="bg-[#fafafa] rounded border-[3px] border-gray-900 p-4 relative z-10 flex items-center gap-3">
-                                    <div class="animate-spin h-5 w-5 border-[3px] border-gray-900 border-t-transparent rounded-full"></div>
-                                    <span id="ai-loading-text" class="text-sm font-medium">Generating analysis...</span>
+                                <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                                <div class="bg-[#fafafa] rounded-lg border-[3px] border-gray-900 p-5 relative z-10 space-y-3">
+                                    <div class="flex items-center gap-3 mb-4">
+                                        <div class="animate-spin h-5 w-5 border-[3px] border-gray-900 border-t-transparent rounded-full"></div>
+                                        <span id="ai-loading-text" class="text-sm font-medium">Generating analysis...</span>
+                                    </div>
+                                    <div class="skeleton h-4 w-3/4"></div>
+                                    <div class="skeleton h-4 w-full"></div>
+                                    <div class="skeleton h-4 w-5/6"></div>
+                                    <div class="skeleton h-4 w-2/3 mt-2"></div>
+                                    <div class="skeleton h-4 w-full"></div>
+                                    <div class="skeleton h-4 w-4/5"></div>
                                 </div>
                             </div>
                         </div>
                         <!-- AI Result (hidden by default) -->
                         <div id="ai-result" class="hidden">
                             <div class="relative">
-                                <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                                <div class="bg-[#fff4da] border-[3px] border-gray-900 rounded p-4 relative z-10">
+                                <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                                <div class="bg-[#fff4da] border-[3px] border-gray-900 rounded-lg p-4 relative z-10">
                                     <div class="flex justify-between items-center mb-3">
                                         <span id="ai-result-type" class="text-sm font-bold text-gray-700"></span>
                                         <div class="flex items-center gap-2">
-                                            <span id="ai-cached-badge" class="hidden text-xs px-2 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded-full">Cached</span>
+                                            <span id="ai-cached-badge" class="hidden text-xs px-2 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded-full font-medium">Cached</span>
                                             <button type="button" onclick="copyAISummary()"
-                                                    class="px-3 py-1 text-xs bg-[#ffc480] border-[2px] border-gray-900 rounded hover:opacity-80 transition-opacity font-medium">
+                                                    class="px-3 py-1 text-xs bg-[#ffc480] border-[2px] border-gray-900 rounded-lg hover:opacity-80 transition-opacity font-medium">
                                                 Copy
                                             </button>
                                         </div>
@@ -260,8 +284,8 @@
                         <!-- AI Error (hidden by default) -->
                         <div id="ai-error" class="hidden">
                             <div class="relative">
-                                <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                                <div id="ai-error-content" class="bg-red-50 border-[3px] border-red-400 rounded p-4 text-red-700 text-sm relative z-10"></div>
+                                <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                                <div id="ai-error-content" class="bg-red-50 border-[3px] border-red-400 rounded-lg p-4 text-red-700 text-sm relative z-10"></div>
                             </div>
                         </div>
                     </div>
@@ -269,56 +293,73 @@
                     <!-- ==================== CHAT TAB ==================== -->
                     <div id="ai-chat-panel" class="hidden">
                         <!-- Chat messages area -->
-                        <div class="relative mb-4">
-                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                            <div id="chat-messages" class="bg-[#fafafa] border-[3px] border-gray-900 rounded p-4 relative z-10 space-y-4 overflow-y-auto" style="min-height: 200px; max-height: 500px;">
+                        <div class="relative mb-3">
+                            <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div id="chat-messages"
+                                 class="bg-[#fafafa] border-[3px] border-gray-900 rounded-lg p-4 relative z-10 space-y-4 overflow-y-auto chat-scroll"
+                                 style="min-height: 280px; max-height: 560px;">
                                 <!-- Welcome message -->
-                                <div class="chat-msg-assistant flex gap-3">
-                                    <div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>
-                                    <div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]">
-                                        <p class="text-sm text-gray-800">Hi! I can answer questions about this repository. Ask me anything about the code, architecture, bugs, or best practices.</p>
+                                <div class="chat-msg-assistant flex gap-3 animate-fade-in">
+                                    <div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]">
+                                        <p class="text-sm text-gray-800 font-medium">Hello! I have full context of this repository.</p>
+                                        <p class="text-sm text-gray-600 mt-1">Ask me about architecture, code patterns, bugs, or anything else.</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <!-- Quick question suggestions -->
                         <div id="chat-suggestions" class="flex flex-wrap gap-2 mb-3">
-                            <button type="button" onclick="askQuickQuestion('What does this project do?')"
-                                    class="px-3 py-1.5 text-xs bg-[#E8F0FE] border-[2px] border-gray-900 rounded-full hover:bg-[#ffc480] transition-colors font-medium">
-                                What does this project do?
+                            <button type="button" onclick="askQuickQuestion('What does this project do and how is it architected?')"
+                                    class="group px-3 py-1.5 text-xs bg-white border-[2px] border-gray-300 rounded-full hover:border-gray-900 hover:bg-[#fff4da] transition-all font-medium text-gray-600 hover:text-gray-900">
+                                <span class="mr-0.5 opacity-60 group-hover:opacity-100">&#10024;</span> What does this project do?
                             </button>
-                            <button type="button" onclick="askQuickQuestion('What are the main entry points?')"
-                                    class="px-3 py-1.5 text-xs bg-[#E8F0FE] border-[2px] border-gray-900 rounded-full hover:bg-[#ffc480] transition-colors font-medium">
-                                Main entry points?
+                            <button type="button" onclick="askQuickQuestion('What are the main entry points and how does the request flow work?')"
+                                    class="group px-3 py-1.5 text-xs bg-white border-[2px] border-gray-300 rounded-full hover:border-gray-900 hover:bg-[#fff4da] transition-all font-medium text-gray-600 hover:text-gray-900">
+                                <span class="mr-0.5 opacity-60 group-hover:opacity-100">&#128269;</span> Main entry points?
                             </button>
-                            <button type="button" onclick="askQuickQuestion('Are there any potential bugs or issues?')"
-                                    class="px-3 py-1.5 text-xs bg-[#E8F0FE] border-[2px] border-gray-900 rounded-full hover:bg-[#ffc480] transition-colors font-medium">
-                                Any potential bugs?
+                            <button type="button" onclick="askQuickQuestion('Are there any potential bugs, security issues, or anti-patterns in the code?')"
+                                    class="group px-3 py-1.5 text-xs bg-white border-[2px] border-gray-300 rounded-full hover:border-gray-900 hover:bg-[#fff4da] transition-all font-medium text-gray-600 hover:text-gray-900">
+                                <span class="mr-0.5 opacity-60 group-hover:opacity-100">&#128027;</span> Any potential bugs?
                             </button>
-                            <button type="button" onclick="askQuickQuestion('How do I set up the dev environment?')"
-                                    class="px-3 py-1.5 text-xs bg-[#E8F0FE] border-[2px] border-gray-900 rounded-full hover:bg-[#ffc480] transition-colors font-medium">
-                                Dev setup guide?
+                            <button type="button" onclick="askQuickQuestion('How do I set up the development environment and run this project locally?')"
+                                    class="group px-3 py-1.5 text-xs bg-white border-[2px] border-gray-300 rounded-full hover:border-gray-900 hover:bg-[#fff4da] transition-all font-medium text-gray-600 hover:text-gray-900">
+                                <span class="mr-0.5 opacity-60 group-hover:opacity-100">&#128736;</span> Dev setup guide?
                             </button>
                         </div>
-                        <!-- Chat input -->
+                        <!-- Chat input (textarea with auto-resize) -->
                         <div class="relative">
-                            <div class="w-full h-full rounded bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
-                            <div class="flex gap-2 relative z-10">
-                                <input type="text" id="chat-input"
-                                       placeholder="Ask about this codebase..."
-                                       class="flex-1 px-4 py-3 bg-[#fafafa] border-[3px] border-gray-900 rounded text-sm focus:outline-none focus:border-[#ffc480]"
-                                       onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendChatMessage();}">
+                            <div class="w-full h-full rounded-lg bg-gray-900 translate-y-1 translate-x-1 absolute inset-0"></div>
+                            <div class="flex items-end gap-2 relative z-10 bg-[#fafafa] border-[3px] border-gray-900 rounded-lg p-2">
+                                <textarea id="chat-input"
+                                          aria-label="Chat message input"
+                                          placeholder="Ask about this codebase..."
+                                          rows="1"
+                                          class="flex-1 px-3 py-2 bg-transparent text-sm focus:outline-none resize-none font-sans rounded"
+                                          style="max-height: 120px; min-height: 40px;"
+                                          onkeydown="handleChatKeydown(event)"
+                                          oninput="autoResizeChatInput(this)"></textarea>
                                 <button type="button" onclick="sendChatMessage()" id="chat-send-btn"
-                                        class="px-5 py-3 bg-[#ffc480] border-[3px] border-gray-900 rounded font-bold text-sm hover:bg-[#ffb14d] transition-colors flex items-center gap-2">
+                                        aria-label="Send message"
+                                        class="px-4 py-2 bg-[#ffc480] border-[3px] border-gray-900 rounded-lg font-bold text-sm hover:bg-[#ffb14d] transition-all hover:-translate-y-px flex items-center gap-1.5 flex-shrink-0"
+                                        title="Send message (Enter)">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
                                     </svg>
                                     Send
                                 </button>
                             </div>
                         </div>
-                        <!-- Clear chat button -->
-                        <div class="flex justify-end mt-2">
+                        <div class="flex justify-between items-center mt-2 px-1">
+                            <span class="text-[10px] text-gray-400 font-mono" id="chat-hint">
+                                <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px]">Enter</kbd> send
+                                <span class="mx-1">&middot;</span>
+                                <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px]">Shift+Enter</kbd> new line
+                            </span>
                             <button type="button" onclick="clearChat()"
                                     class="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                                 Clear conversation
@@ -326,6 +367,14 @@
                         </div>
                     </div>
                 </div>
+                <!-- Floating "Ask AI" button (appears when AI section is off-screen) -->
+                <button id="ai-float-btn" onclick="scrollToAI()"
+                        class="hidden fixed bottom-6 right-6 z-50 px-4 py-2.5 bg-[#ffc480] border-[3px] border-gray-900 rounded-full shadow-[3px_3px_0_0_rgba(0,0,0,1)] font-bold text-sm hover:-translate-y-1 transition-transform flex items-center gap-2">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                    </svg>
+                    Ask AI
+                </button>
             </div>
         </div>
     </div>

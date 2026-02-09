@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Request
@@ -43,7 +44,14 @@ async def summary_available() -> JSONResponse:
         JSON object with ``available`` boolean.
 
     """
-    return JSONResponse({"available": bool(settings.claude_api_key)})
+    available = bool(settings.claude_api_key)
+    if not available:
+        logger.warning(
+            "AI summary not available: claude_api_key is empty. "
+            "ENV CLAUDE_API_KEY=%s",
+            "SET" if os.environ.get("CLAUDE_API_KEY") else "NOT SET",
+        )
+    return JSONResponse({"available": available})
 
 
 @router.post("/api/summary/stream")

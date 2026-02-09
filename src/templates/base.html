@@ -27,6 +27,8 @@
         <meta name="twitter:title"       content="GitUnderstand">
         <meta name="twitter:description"
               content="Turn any Git repository into a prompt-friendly text digest for LLMs.">
+        {# Favicon — inline SVG, no static file needed #}
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FCA847'/%3E%3Ctext y='.88em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui,sans-serif' font-weight='800' fill='%23111827'%3EG%3C/text%3E%3C/svg%3E">
         {# Title #}
         <title>
             {% block title %}
@@ -37,10 +39,40 @@
                 {% endif %}
             {% endblock %}
         </title>
+        {# Google Fonts — Inter (UI) + JetBrains Mono (code) #}
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+                    }
+                }
+            }
+        }
+        </script>
         {# Prism.js for syntax highlighting #}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css">
         <style type="text/tailwindcss">
+          :root {
+            --color-bg: #FFFDF8;
+            --color-surface: #fff4da;
+            --color-surface-alt: #fafafa;
+            --color-accent: #FCA847;
+            --color-accent-hover: #ffb14d;
+            --color-button: #ffc480;
+            --color-pink: #FE4A60;
+            --color-blue: #E8F0FE;
+            --color-border: #1f2937;
+            --color-text: #111827;
+            --color-text-muted: #6b7280;
+          }
+
           @layer components {
             .badge-new {
               @apply inline-block -rotate-6 -translate-y-1 mx-1 px-1 bg-[#FE4A60] border border-gray-900 text-white text-[10px] font-bold shadow-[2px_2px_0_0_rgba(0,0,0,1)];
@@ -64,6 +96,53 @@
             .link-bounce {
               @apply transition-transform hover:-translate-y-0.5;
             }
+          }
+
+          /* Fade-in animation for sections and messages */
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-fade-in {
+            animation: fadeInUp 0.35s ease-out both;
+          }
+          .animate-delay-1 { animation-delay: 0.08s; }
+          .animate-delay-2 { animation-delay: 0.16s; }
+          .animate-delay-3 { animation-delay: 0.24s; }
+
+          /* Premium typing indicator for AI thinking */
+          @keyframes typingPulse {
+            0%, 60%, 100% { opacity: 0.25; transform: scale(0.85); }
+            30% { opacity: 1; transform: scale(1); }
+          }
+          .typing-dot {
+            animation: typingPulse 1.4s infinite ease-in-out;
+          }
+          .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+          .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+          /* Skeleton shimmer for loading states */
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+          .skeleton {
+            background: linear-gradient(90deg, #fff4da 25%, #ffe8b5 50%, #fff4da 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+          }
+
+          /* Custom scrollbar for chat area */
+          .chat-scroll::-webkit-scrollbar { width: 5px; }
+          .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+          .chat-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+          .chat-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+          /* Better focus styles */
+          button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+            outline: 3px solid #FCA847;
+            outline-offset: 2px;
           }
 
           /* Interactive tree styles */
@@ -102,7 +181,7 @@
           }
           code[class*="language-"] {
             font-size: 0.875rem !important;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace !important;
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace !important;
           }
 
           /* Highlighted view file blocks */
@@ -116,7 +195,7 @@
             padding: 0.5rem 0.75rem;
             background: #1f2937;
             color: #f9fafb;
-            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
             font-size: 0.8rem;
             border-radius: 0.375rem 0.375rem 0 0;
             border: 3px solid #1f2937;
@@ -131,7 +210,7 @@
           }
         </style>
     </head>
-    <body class="bg-[#FFFDF8] min-h-screen flex flex-col">
+    <body class="bg-[#FFFDF8] min-h-screen flex flex-col font-sans">
         {% include 'components/navbar.html' %}
         {# Main content wrapper #}
         <main class="flex-1 w-full">

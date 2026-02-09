@@ -832,29 +832,53 @@ const AI_TYPE_LABELS = {
     security: 'Security Audit',
 };
 
-function checkAISummaryAvailable() {
-    const section = document.getElementById('ai-analysis-section');
+function checkAISummaryAvailable(attempt) {
+    if (attempt === undefined) { attempt = 0; }
+    var maxAttempts = 3;
+    var section = document.getElementById('ai-analysis-section');
     if (!section) { return; }
 
     // Always show the AI section after ingest
     section.classList.remove('hidden');
 
     fetch('/api/summary/available')
-        .then((r) => r.json())
-        .then((data) => {
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
             window._aiAvailable = !!data.available;
-            const notice = document.getElementById('ai-not-configured');
+            var notice = document.getElementById('ai-not-configured');
             if (notice) {
                 notice.classList.toggle('hidden', window._aiAvailable);
             }
             // Disable buttons if not available
             _toggleAIButtons(!window._aiAvailable);
+
+            // Setup floating AI button
+            _setupAIFloatButton();
+
+            // Restore chat history from sessionStorage
+            if (window._aiAvailable) {
+                _restoreChatHistory();
+            }
+
+            // Retry if not available and attempts remain (handles Cloud Run cold starts)
+            if (!window._aiAvailable && attempt < maxAttempts) {
+                setTimeout(function () {
+                    checkAISummaryAvailable(attempt + 1);
+                }, 2000 * (attempt + 1));
+            }
         })
-        .catch(() => {
+        .catch(function () {
             window._aiAvailable = false;
-            const notice = document.getElementById('ai-not-configured');
+            var notice = document.getElementById('ai-not-configured');
             if (notice) { notice.classList.remove('hidden'); }
             _toggleAIButtons(true);
+
+            // Retry on network error
+            if (attempt < maxAttempts) {
+                setTimeout(function () {
+                    checkAISummaryAvailable(attempt + 1);
+                }, 2000 * (attempt + 1));
+            }
         });
 }
 
@@ -1049,8 +1073,9 @@ function sendChatMessage() {
         return;
     }
 
-    // Clear input
+    // Clear input and reset textarea height
     input.value = '';
+    input.style.height = 'auto';
 
     // Hide suggestions after first message
     const suggestions = document.getElementById('chat-suggestions');
@@ -1059,8 +1084,9 @@ function sendChatMessage() {
     // Add user message to UI
     _appendChatMessage('user', message);
 
-    // Add to history
+    // Add to history and persist
     window._chatHistory.push({ role: 'user', content: message });
+    _saveChatHistory();
 
     // Show thinking indicator
     const thinkingId = _appendChatThinking();
@@ -1094,16 +1120,21 @@ function askQuickQuestion(question) {
 
 function clearChat() {
     window._chatHistory = [];
+    _saveChatHistory();
     const container = document.getElementById('chat-messages');
     if (!container) { return; }
 
-    // Reset to welcome message
+    // Reset to welcome message with new avatar style
     container.innerHTML = '';
     const welcome = document.createElement('div');
-    welcome.className = 'chat-msg-assistant flex gap-3';
-    welcome.innerHTML = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>'
-        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]">'
-        + '<p class="text-sm text-gray-800">Hi! I can answer questions about this repository. Ask me anything about the code, architecture, bugs, or best practices.</p>'
+    welcome.className = 'chat-msg-assistant flex gap-3 animate-fade-in';
+    welcome.innerHTML = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+        + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+        + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
+        + '</svg></div>'
+        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]">'
+        + '<p class="text-sm text-gray-800 font-medium">Hello! I have full context of this repository.</p>'
+        + '<p class="text-sm text-gray-600 mt-1">Ask me about architecture, code patterns, bugs, or anything else.</p>'
         + '</div>';
     container.appendChild(welcome);
 
@@ -1125,8 +1156,9 @@ function _handleChatEvent(event, thinkingId) {
             const content = payload.content || '';
             _appendChatMessage('assistant', content);
 
-            // Add to history
+            // Add to history and persist
             window._chatHistory.push({ role: 'assistant', content: content });
+            _saveChatHistory();
 
             window._chatBusy = false;
             _setChatInputState(false);
@@ -1154,42 +1186,70 @@ function _appendChatMessage(role, content) {
     if (!container) { return; }
 
     const wrapper = document.createElement('div');
+    wrapper.className = 'animate-fade-in';
+    const timeStr = _formatTimeAgo(new Date());
 
     if (role === 'user') {
-        wrapper.className = 'chat-msg-user flex gap-3 justify-end';
-        wrapper.innerHTML = '<div class="bg-[#E8F0FE] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]">'
+        wrapper.className += ' chat-msg-user flex gap-3 justify-end';
+        wrapper.innerHTML = '<div class="bg-[#E8F0FE] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]">'
             + '<p class="text-sm text-gray-800 whitespace-pre-wrap">' + _escapeHtml(content) + '</p>'
+            + '<span class="text-[10px] text-gray-400 mt-1 block text-right">' + timeStr + '</span>'
             + '</div>'
-            + '<div class="w-7 h-7 rounded-full bg-[#E8F0FE] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">You</div>';
+            + '<div class="w-8 h-8 rounded-lg bg-[#E8F0FE] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">You</div>';
     } else {
-        wrapper.className = 'chat-msg-assistant flex gap-3';
-        const avatar = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>';
+        wrapper.className += ' chat-msg-assistant flex gap-3';
+        const avatarHtml = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+            + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+            + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
+            + '</svg></div>';
         const bubble = document.createElement('div');
-        bubble.className = 'bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[85%]';
+        bubble.className = 'bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 max-w-[80%]';
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'text-sm leading-relaxed';
         renderMarkdownContent(content, contentDiv);
         bubble.appendChild(contentDiv);
 
-        // Copy button for assistant messages
+        // Footer with timestamp and copy
+        const footer = document.createElement('div');
+        footer.className = 'flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200';
+
+        const time = document.createElement('span');
+        time.className = 'text-[10px] text-gray-400';
+        time.textContent = timeStr;
+        footer.appendChild(time);
+
         const copyBtn = document.createElement('button');
-        copyBtn.className = 'mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors';
-        copyBtn.textContent = 'Copy';
+        copyBtn.className = 'text-[10px] text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1';
+        copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> Copy';
         copyBtn.onclick = function () {
-            navigator.clipboard.writeText(content).then(() => {
-                copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1000);
+            navigator.clipboard.writeText(content).then(function () {
+                copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied';
+                setTimeout(function () {
+                    copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> Copy';
+                }, 1500);
             });
         };
-        bubble.appendChild(copyBtn);
+        footer.appendChild(copyBtn);
+        bubble.appendChild(footer);
 
-        wrapper.innerHTML = avatar;
+        const avatarEl = document.createElement('div');
+        avatarEl.innerHTML = avatarHtml;
+        wrapper.appendChild(avatarEl.firstChild);
         wrapper.appendChild(bubble);
     }
 
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
+}
+
+function _formatTimeAgo(date) {
+    var now = new Date();
+    var diff = Math.floor((now - date) / 1000);
+    if (diff < 60) { return 'just now'; }
+    if (diff < 3600) { return Math.floor(diff / 60) + 'm ago'; }
+    if (diff < 86400) { return Math.floor(diff / 3600) + 'h ago'; }
+    return date.toLocaleDateString();
 }
 
 function _appendChatThinking() {
@@ -1199,13 +1259,16 @@ function _appendChatThinking() {
     const id = 'thinking-' + Date.now();
     const wrapper = document.createElement('div');
     wrapper.id = id;
-    wrapper.className = 'chat-msg-assistant flex gap-3';
-    wrapper.innerHTML = '<div class="w-7 h-7 rounded-full bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0 text-xs font-bold">AI</div>'
-        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg p-3 flex items-center gap-2">'
-        + '<div class="flex gap-1"><span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></span>'
-        + '<span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></span>'
-        + '<span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></span></div>'
-        + '<span class="text-xs text-gray-400 ml-1">Thinking...</span></div>';
+    wrapper.className = 'chat-msg-assistant flex gap-3 animate-fade-in';
+    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg bg-[#ffc480] border-[2px] border-gray-900 flex items-center justify-center flex-shrink-0">'
+        + '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+        + '<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>'
+        + '</svg></div>'
+        + '<div class="bg-[#fff4da] border-[2px] border-gray-900 rounded-lg px-4 py-3 flex items-center gap-1.5">'
+        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
+        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
+        + '<span class="w-1.5 h-1.5 bg-gray-500 rounded-full typing-dot"></span>'
+        + '</div>';
 
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
@@ -1223,9 +1286,9 @@ function _appendChatError(message) {
     if (!container) { return; }
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'chat-msg-error flex gap-3';
-    wrapper.innerHTML = '<div class="w-7 h-7 rounded-full bg-red-100 border-[2px] border-red-400 flex items-center justify-center flex-shrink-0 text-xs">!</div>'
-        + '<div class="bg-red-50 border-[2px] border-red-300 rounded-lg p-3 max-w-[85%]">'
+    wrapper.className = 'chat-msg-error flex gap-3 animate-fade-in';
+    wrapper.innerHTML = '<div class="w-8 h-8 rounded-lg bg-red-100 border-[2px] border-red-400 flex items-center justify-center flex-shrink-0 text-xs font-bold text-red-600">!</div>'
+        + '<div class="bg-red-50 border-[2px] border-red-300 rounded-lg p-3 max-w-[80%]">'
         + '<p class="text-sm text-red-700">' + _escapeHtml(message) + '</p></div>';
 
     container.appendChild(wrapper);
@@ -1317,8 +1380,16 @@ function renderMarkdownContent(markdown, container) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        // Code blocks (must come before inline code)
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto my-2 font-mono"><code>$2</code></pre>')
+        // Code blocks with language label and copy button
+        .replace(/```(\w*)\n([\s\S]*?)```/g, function (match, lang, code) {
+            var codeId = 'code-' + Math.random().toString(36).substr(2, 8);
+            var langLabel = lang ? '<span class="absolute top-2 right-12 text-[10px] text-gray-400 font-mono uppercase">' + lang + '</span>' : '';
+            return '<div class="relative my-3">'
+                + langLabel
+                + '<button onclick="copyCodeBlock(\'' + codeId + '\')" class="absolute top-2 right-2 text-[10px] text-gray-400 hover:text-gray-200 px-1.5 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors">Copy</button>'
+                + '<pre id="' + codeId + '" class="bg-gray-900 text-gray-100 p-3 rounded-lg text-xs overflow-x-auto font-mono leading-relaxed"><code>' + code + '</code></pre>'
+                + '</div>';
+        })
         // Inline code
         .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-xs font-mono">$1</code>')
         // Headers
@@ -1345,6 +1416,19 @@ function renderMarkdownContent(markdown, container) {
     html = '<p class="my-2">' + html + '</p>';
 
     container.innerHTML = html;
+}
+
+function copyCodeBlock(id) {
+    var el = document.getElementById(id);
+    if (!el) { return; }
+    var text = el.textContent;
+    var btn = el.parentElement.querySelector('button');
+    navigator.clipboard.writeText(text).then(function () {
+        if (btn) {
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1621,11 +1705,114 @@ function submitExample(repoName) {
 }
 
 // ---------------------------------------------------------------------------
-// Global Enter key handler
+// Chat input helpers
+// ---------------------------------------------------------------------------
+
+function handleChatKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+    }
+}
+
+function autoResizeChatInput(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ---------------------------------------------------------------------------
+// Chat history persistence (sessionStorage)
+// ---------------------------------------------------------------------------
+
+function _saveChatHistory() {
+    if (window.currentDigestId) {
+        try {
+            sessionStorage.setItem(
+                'chat_' + window.currentDigestId,
+                JSON.stringify(window._chatHistory)
+            );
+        } catch (e) { /* ignore quota errors */ }
+    }
+}
+
+function _restoreChatHistory() {
+    if (!window.currentDigestId) { return; }
+    try {
+        var saved = sessionStorage.getItem('chat_' + window.currentDigestId);
+        if (!saved) { return; }
+        var history = JSON.parse(saved);
+        if (!Array.isArray(history) || history.length === 0) { return; }
+
+        window._chatHistory = history;
+        // Re-render messages
+        history.forEach(function (msg) {
+            _appendChatMessage(msg.role, msg.content);
+        });
+        // Hide suggestions if we have history
+        var suggestions = document.getElementById('chat-suggestions');
+        if (suggestions) { suggestions.classList.add('hidden'); }
+    } catch (e) { /* ignore parse errors */ }
+}
+
+// ---------------------------------------------------------------------------
+// Floating "Ask AI" button
+// ---------------------------------------------------------------------------
+
+function scrollToAI() {
+    var section = document.getElementById('ai-analysis-section');
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        switchAITab('chat');
+        setTimeout(function () {
+            var input = document.getElementById('chat-input');
+            if (input && !input.disabled) { input.focus(); }
+        }, 500);
+    }
+}
+
+function _setupAIFloatButton() {
+    var btn = document.getElementById('ai-float-btn');
+    var section = document.getElementById('ai-analysis-section');
+    if (!btn || !section) { return; }
+
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            var resultsVisible = document.getElementById('results-section');
+            var isVisible = resultsVisible && resultsVisible.style.display !== 'none';
+            btn.classList.toggle('hidden', entry.isIntersecting || !isVisible);
+        });
+    }, { threshold: 0.1 });
+
+    observer.observe(section);
+}
+
+// ---------------------------------------------------------------------------
+// Global Enter key handler + keyboard shortcuts
 // ---------------------------------------------------------------------------
 
 function setupGlobalEnterHandler() {
     document.addEventListener('keydown', (event) => {
+        // Cmd+K / Ctrl+K to focus chat
+        if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+            event.preventDefault();
+            var chatInput = document.getElementById('chat-input');
+            if (chatInput && !chatInput.disabled) {
+                switchAITab('chat');
+                chatInput.focus();
+            }
+            return;
+        }
+        // Escape to clear and blur chat input
+        if (event.key === 'Escape') {
+            var chatIn = document.getElementById('chat-input');
+            if (chatIn && document.activeElement === chatIn) {
+                chatIn.value = '';
+                chatIn.style.height = 'auto';
+                chatIn.blur();
+            }
+            return;
+        }
+        // Enter to submit ingest form (but not from textarea)
         if (event.key === 'Enter' && !event.target.matches('textarea')) {
             const form = document.getElementById('ingestForm');
             if (form) {
@@ -1667,3 +1854,9 @@ window.switchAITab = switchAITab;
 window.sendChatMessage = sendChatMessage;
 window.askQuickQuestion = askQuickQuestion;
 window.clearChat = clearChat;
+window.checkAISummaryAvailable = checkAISummaryAvailable;
+// Phase 8C: Premium UI
+window.handleChatKeydown = handleChatKeydown;
+window.autoResizeChatInput = autoResizeChatInput;
+window.scrollToAI = scrollToAI;
+window.copyCodeBlock = copyCodeBlock;
