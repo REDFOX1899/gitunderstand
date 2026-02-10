@@ -218,7 +218,8 @@ jobs:
           python -m pip install -r diagrams/backend/requirements.txt pytest
 
       - name: Run unit tests
-        run: pytest diagrams/backend/tests/ -v -m "not integration"
+        working-directory: diagrams/backend
+        run: pytest tests/ -v -m "not integration"
 
   # Deploy the diagrams backend (FastAPI) to Cloud Run
   deploy-diagrams-backend:
