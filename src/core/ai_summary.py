@@ -16,7 +16,8 @@ MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2  # seconds
 
 # Maximum characters to send to Claude (leave room for prompt within 200K context)
-MAX_CONTENT_CHARS = 1_500_000
+# ~4 chars per token; 180K token budget leaves 20K for prompt/response
+MAX_CONTENT_CHARS = 700_000
 
 # Maximum characters for chat context (smaller to leave room for conversation history
 # and to reduce token usage for rate-limit-constrained plans)

@@ -17,14 +17,33 @@ type DrizzleDatabase =
 // Check if we're using Neon/Vercel (production) or local Postgres
 const isNeonConnection = process.env.POSTGRES_URL?.includes("neon.tech");
 
+function createPostgresClient() {
+  const connUrl = process.env.POSTGRES_URL!;
+
+  // Cloud SQL Unix socket: extract ?host=/cloudsql/... and pass separately
+  // because postgres.js uses new URL() which ignores the host query param
+  try {
+    const parsed = new URL(connUrl);
+    const socketPath = parsed.searchParams.get("host");
+    if (socketPath) {
+      parsed.searchParams.delete("host");
+      return postgres(parsed.toString(), { host: socketPath });
+    }
+  } catch {
+    // URL parsing failed, use as-is
+  }
+
+  return postgres(connUrl);
+}
+
 let db: DrizzleDatabase;
 if (isNeonConnection) {
   // Production: Use Neon HTTP connection
   const sql = neon(process.env.POSTGRES_URL!);
   db = drizzleNeon(sql, { schema });
 } else {
-  // Local development: Use standard Postgres connection
-  const client = postgres(process.env.POSTGRES_URL!);
+  // Local/Cloud SQL: Use standard Postgres connection
+  const client = createPostgresClient();
   db = drizzlePostgres(client, { schema });
 }
 
