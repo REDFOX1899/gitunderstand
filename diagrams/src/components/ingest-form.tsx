@@ -12,7 +12,6 @@ const PRESETS: Record<
     label: string;
     pattern_type: "exclude" | "include";
     pattern: string;
-    output_format?: string;
   }
 > = {
   "code-review": {
@@ -25,7 +24,6 @@ const PRESETS: Record<
     label: "Documentation",
     pattern_type: "include",
     pattern: "*.md, *.rst, *.txt, *.doc, README*",
-    output_format: "markdown",
   },
   architecture: {
     label: "Architecture",
@@ -37,7 +35,6 @@ const PRESETS: Record<
     label: "Full Digest",
     pattern_type: "exclude",
     pattern: "",
-    output_format: "text",
   },
 };
 
@@ -74,24 +71,16 @@ export function IngestForm({ onSubmit, loading }: IngestFormProps) {
   );
   const [pattern, setPattern] = useState("");
   const [sliderValue, setSliderValue] = useState(250);
-  const [outputFormat, setOutputFormat] = useState<
-    "text" | "json" | "markdown" | "xml"
-  >("text");
-  const [targetModel, setTargetModel] = useState("");
   const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [showControls, setShowControls] = useState(false);
   const [formError, setFormError] = useState("");
   const patternRef = useRef<HTMLInputElement>(null);
 
   const handlePreset = useCallback(
     (presetName: string) => {
       if (activePreset === presetName) {
-        // Toggle off -> apply full-digest
         const fd = PRESETS["full-digest"]!;
         setPatternType(fd.pattern_type);
         setPattern(fd.pattern);
-        if (fd.output_format)
-          setOutputFormat(fd.output_format as typeof outputFormat);
         setActivePreset(null);
         return;
       }
@@ -99,8 +88,6 @@ export function IngestForm({ onSubmit, loading }: IngestFormProps) {
       if (!preset) return;
       setPatternType(preset.pattern_type);
       setPattern(preset.pattern);
-      if (preset.output_format)
-        setOutputFormat(preset.output_format as typeof outputFormat);
       setActivePreset(presetName);
     },
     [activePreset],
@@ -127,12 +114,12 @@ export function IngestForm({ onSubmit, loading }: IngestFormProps) {
         pattern_type: patternType,
         pattern,
         max_file_size: logSliderToSize(sliderValue),
-        output_format: outputFormat,
-        target_model: targetModel,
+        output_format: "markdown",
+        target_model: "",
         token: pat,
       });
     },
-    [url, patternType, pattern, sliderValue, outputFormat, targetModel, onSubmit],
+    [url, patternType, pattern, sliderValue, onSubmit],
   );
 
   const handleExampleClick = useCallback((repoUrl: string) => {
@@ -181,105 +168,57 @@ export function IngestForm({ onSubmit, loading }: IngestFormProps) {
               {preset.label}
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setShowControls(!showControls)}
-            className="ml-auto rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100"
-          >
-            {showControls ? "Hide Options" : "Options"}
-          </button>
         </div>
 
-        {/* Advanced controls */}
-        {showControls && (
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-stone-200 bg-stone-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Pattern type + pattern */}
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                File Pattern
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={patternType}
-                  onChange={(e) =>
-                    setPatternType(e.target.value as "exclude" | "include")
-                  }
-                  className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
-                >
-                  <option value="exclude">Exclude</option>
-                  <option value="include">Include</option>
-                </select>
-                <input
-                  ref={patternRef}
-                  value={pattern}
-                  onChange={(e) => {
-                    setPattern(e.target.value);
-                    setActivePreset(null);
-                  }}
-                  placeholder="*.py, *.js, node_modules/"
-                  className="flex-1 rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 placeholder:text-stone-400"
-                />
-              </div>
-            </div>
-
-            {/* File size slider */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Max File Size:{" "}
-                <span className="font-bold text-cyan-600">
-                  {fileSizeDisplay}
-                </span>
-              </label>
+        {/* Options (always visible) */}
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-stone-200 bg-stone-50 p-4 sm:grid-cols-2">
+          {/* Pattern type + pattern */}
+          <div className="sm:col-span-1">
+            <label className="mb-1 block text-xs font-medium text-stone-600">
+              File Pattern
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={patternType}
+                onChange={(e) =>
+                  setPatternType(e.target.value as "exclude" | "include")
+                }
+                className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
+              >
+                <option value="exclude">Exclude</option>
+                <option value="include">Include</option>
+              </select>
               <input
-                type="range"
-                min={1}
-                max={500}
-                value={sliderValue}
-                onChange={(e) => setSliderValue(Number(e.target.value))}
-                className="w-full accent-cyan-600"
+                ref={patternRef}
+                value={pattern}
+                onChange={(e) => {
+                  setPattern(e.target.value);
+                  setActivePreset(null);
+                }}
+                placeholder="*.py, *.js, node_modules/"
+                className="flex-1 rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 placeholder:text-stone-400"
               />
             </div>
-
-            {/* Output format */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Output Format
-              </label>
-              <select
-                value={outputFormat}
-                onChange={(e) =>
-                  setOutputFormat(
-                    e.target.value as "text" | "json" | "markdown" | "xml",
-                  )
-                }
-                className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
-              >
-                <option value="text">Text</option>
-                <option value="json">JSON</option>
-                <option value="markdown">Markdown</option>
-                <option value="xml">XML</option>
-              </select>
-            </div>
-
-            {/* Chunk for model */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Chunk for Model
-              </label>
-              <select
-                value={targetModel}
-                onChange={(e) => setTargetModel(e.target.value)}
-                className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700"
-              >
-                <option value="">None</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="claude">Claude</option>
-                <option value="gemini">Gemini</option>
-                <option value="llama3">Llama 3</option>
-              </select>
-            </div>
           </div>
-        )}
+
+          {/* File size slider */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-stone-600">
+              Max File Size:{" "}
+              <span className="font-bold text-cyan-600">
+                {fileSizeDisplay}
+              </span>
+            </label>
+            <input
+              type="range"
+              min={1}
+              max={500}
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              className="w-full accent-cyan-600"
+            />
+          </div>
+        </div>
 
         {/* Example repos */}
         <div className="space-y-1">

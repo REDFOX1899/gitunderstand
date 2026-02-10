@@ -49,12 +49,6 @@ export function Header() {
           </span>
         </Link>
         <nav className="flex items-center gap-3 sm:gap-6">
-          <Link
-            href="/diagrams"
-            className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-900"
-          >
-            Diagrams
-          </Link>
           <span
             onClick={() => setIsApiKeyDialogOpen(true)}
             className="cursor-pointer text-sm font-medium text-stone-600 transition-colors hover:text-stone-900"
