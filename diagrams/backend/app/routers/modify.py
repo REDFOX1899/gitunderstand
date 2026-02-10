@@ -1,24 +1,16 @@
 from fastapi import APIRouter, Request, HTTPException
 from dotenv import load_dotenv
-
-# from app.services.claude_service import ClaudeService
-# from app.core.limiter import limiter
+from app.services.claude_service import ClaudeService
 from anthropic._exceptions import RateLimitError
 from app.prompts import SYSTEM_MODIFY_PROMPT
 from pydantic import BaseModel
-from app.services.o1_mini_openai_service import OpenAIO1Service
-
 
 load_dotenv()
 
 router = APIRouter(prefix="/modify", tags=["Claude"])
 
 # Initialize services
-# claude_service = ClaudeService()
-o1_service = OpenAIO1Service()
-
-
-# Define the request body model
+claude_service = ClaudeService()
 
 
 class ModifyRequest(BaseModel):
@@ -30,7 +22,6 @@ class ModifyRequest(BaseModel):
 
 
 @router.post("")
-# @limiter.limit("2/minute;10/day")
 async def modify(request: Request, body: ModifyRequest):
     try:
         # Check instructions length
@@ -38,7 +29,7 @@ async def modify(request: Request, body: ModifyRequest):
             return {"error": "Instructions and/or current diagram are required"}
         elif (
             len(body.instructions) > 1000 or len(body.current_diagram) > 100000
-        ):  # just being safe
+        ):
             return {"error": "Instructions exceed maximum length of 1000 characters"}
 
         if body.repo in [
@@ -50,16 +41,7 @@ async def modify(request: Request, body: ModifyRequest):
         ]:
             return {"error": "Example repos cannot be modified"}
 
-        # modified_mermaid_code = claude_service.call_claude_api(
-        #     system_prompt=SYSTEM_MODIFY_PROMPT,
-        #     data={
-        #         "instructions": body.instructions,
-        #         "explanation": body.explanation,
-        #         "diagram": body.current_diagram,
-        #     },
-        # )
-
-        modified_mermaid_code = o1_service.call_o1_api(
+        modified_mermaid_code = claude_service.call_claude_api(
             system_prompt=SYSTEM_MODIFY_PROMPT,
             data={
                 "instructions": body.instructions,

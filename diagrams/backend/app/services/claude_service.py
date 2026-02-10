@@ -1,37 +1,27 @@
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 from dotenv import load_dotenv
 from app.utils.format_message import format_user_message
+from typing import AsyncGenerator
 
 load_dotenv()
 
 
 class ClaudeService:
+    MODEL = "claude-sonnet-4-5-20250929"
+
     def __init__(self):
         self.default_client = Anthropic()
+        self.async_client = AsyncAnthropic()
 
     def call_claude_api(
         self, system_prompt: str, data: dict, api_key: str | None = None
     ) -> str:
-        """
-        Makes an API call to Claude and returns the response.
-
-        Args:
-            system_prompt (str): The instruction/system prompt
-            data (dict): Dictionary of variables to format into the user message
-            api_key (str | None): Optional custom API key
-
-        Returns:
-            str: Claude's response text
-        """
-        # Create the user message with the data
         user_message = format_user_message(data)
-
-        # Use custom client if API key provided, otherwise use default
         client = Anthropic(api_key=api_key) if api_key else self.default_client
 
         message = client.messages.create(
-            model="claude-3-5-sonnet-latest",
-            max_tokens=4096,
+            model=self.MODEL,
+            max_tokens=8192,
             temperature=0,
             system=system_prompt,
             messages=[
@@ -40,18 +30,30 @@ class ClaudeService:
         )
         return message.content[0].text  # type: ignore
 
+    async def call_claude_api_stream(
+        self,
+        system_prompt: str,
+        data: dict,
+        api_key: str | None = None,
+    ) -> AsyncGenerator[str, None]:
+        user_message = format_user_message(data)
+        client = AsyncAnthropic(api_key=api_key) if api_key else self.async_client
+
+        async with client.messages.stream(
+            model=self.MODEL,
+            max_tokens=8192,
+            temperature=0,
+            system=system_prompt,
+            messages=[
+                {"role": "user", "content": [{"type": "text", "text": user_message}]}
+            ],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
+
     def count_tokens(self, prompt: str) -> int:
-        """
-        Counts the number of tokens in a prompt.
-
-        Args:
-            prompt (str): The prompt to count tokens for
-
-        Returns:
-            int: Number of input tokens
-        """
         response = self.default_client.messages.count_tokens(
-            model="claude-3-5-sonnet-latest",
+            model=self.MODEL,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.input_tokens

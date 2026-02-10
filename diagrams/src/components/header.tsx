@@ -32,7 +32,7 @@ export function Header() {
   };
 
   const handleApiKeySubmit = (apiKey: string) => {
-    localStorage.setItem("openai_key", apiKey);
+    localStorage.setItem("anthropic_key", apiKey);
     setIsApiKeyDialogOpen(false);
   };
 

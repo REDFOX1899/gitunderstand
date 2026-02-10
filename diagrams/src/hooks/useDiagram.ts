@@ -74,7 +74,7 @@ export function useDiagram(username: string, repo: string) {
             username,
             repo,
             instructions,
-            api_key: localStorage.getItem("openai_key") ?? undefined,
+            api_key: localStorage.getItem("anthropic_key") ?? undefined,
             github_pat: githubPat,
           }),
         });
@@ -232,7 +232,7 @@ export function useDiagram(username: string, repo: string) {
   useEffect(() => {
     if (state.status === "complete" && state.diagram) {
       // Cache the completed diagram with the usedOwnKey flag
-      const hasApiKey = !!localStorage.getItem("openai_key");
+      const hasApiKey = !!localStorage.getItem("anthropic_key");
       void cacheDiagramAndExplanation(
         username,
         repo,
@@ -268,7 +268,7 @@ export function useDiagram(username: string, repo: string) {
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
       // Only check for API key if we need to generate a new diagram
-      // const storedApiKey = localStorage.getItem("openai_key");
+      // const storedApiKey = localStorage.getItem("anthropic_key");
       // if (hasUsedFreeGeneration && !storedApiKey) {
       //   setError(
       //     "You've used your one free diagram. Please enter your API key to continue. As a student, I can't afford to keep it totally free and I hope you understand :)",
@@ -353,7 +353,7 @@ export function useDiagram(username: string, repo: string) {
       const github_pat = localStorage.getItem("github_pat");
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
-      // const storedApiKey = localStorage.getItem("openai_key");
+      // const storedApiKey = localStorage.getItem("anthropic_key");
 
       // Check if user has used their free generation and doesn't have an API key
       // if (hasUsedFreeGeneration && !storedApiKey) {
@@ -444,7 +444,7 @@ export function useDiagram(username: string, repo: string) {
     setError("");
 
     // Store the key first
-    localStorage.setItem("openai_key", apiKey);
+    localStorage.setItem("anthropic_key", apiKey);
 
     // Then generate diagram using stored key
     const github_pat = localStorage.getItem("github_pat");

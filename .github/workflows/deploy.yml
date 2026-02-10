@@ -242,7 +242,7 @@ jobs:
             --min-instances 0 \
             --max-instances 5 \
             --timeout 300 \
-            --set-secrets "OPENAI_API_KEY=openai-api-key:latest" \
+            --set-secrets "ANTHROPIC_API_KEY=claude-api-key:latest" \
             --set-env-vars "ENVIRONMENT=production" \
             --project ${{ env.PROJECT_ID }}
 

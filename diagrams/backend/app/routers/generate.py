@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from app.services.github_service import GitHubService
-from app.services.o4_mini_openai_service import OpenAIo4Service
+from app.services.claude_service import ClaudeService
 from app.prompts import (
     SYSTEM_FIRST_PROMPT,
     SYSTEM_SECOND_PROMPT,
@@ -16,16 +16,12 @@ import re
 import json
 import asyncio
 
-# from app.services.claude_service import ClaudeService
-# from app.core.limiter import limiter
-
 load_dotenv()
 
-router = APIRouter(prefix="/generate", tags=["OpenAI o4-mini"])
+router = APIRouter(prefix="/generate", tags=["Claude"])
 
 # Initialize services
-# claude_service = ClaudeService()
-o4_service = OpenAIo4Service()
+claude_service = ClaudeService()
 
 
 # cache github data to avoid double API calls from cost and generate
@@ -53,7 +49,6 @@ class ApiRequest(BaseModel):
 
 
 @router.post("/cost")
-# @limiter.limit("5/minute") # TEMP: disable rate limit for growth??
 async def get_generation_cost(request: Request, body: ApiRequest):
     try:
         # Get file tree and README content
@@ -61,26 +56,14 @@ async def get_generation_cost(request: Request, body: ApiRequest):
         file_tree = github_data["file_tree"]
         readme = github_data["readme"]
 
-        # Calculate combined token count
-        # file_tree_tokens = claude_service.count_tokens(file_tree)
-        # readme_tokens = claude_service.count_tokens(readme)
+        file_tree_tokens = claude_service.count_tokens(file_tree)
+        readme_tokens = claude_service.count_tokens(readme)
 
-        file_tree_tokens = o4_service.count_tokens(file_tree)
-        readme_tokens = o4_service.count_tokens(readme)
-
-        # CLAUDE: Calculate approximate cost
-        # Input cost: $3 per 1M tokens ($0.000003 per token)
-        # Output cost: $15 per 1M tokens ($0.000015 per token)
-        # input_cost = ((file_tree_tokens * 2 + readme_tokens) + 3000) * 0.000003
-        # output_cost = 3500 * 0.000015
-        # estimated_cost = input_cost + output_cost
-
-        # Input cost: $1.1 per 1M tokens ($0.0000011 per token)
-        # Output cost: $4.4 per 1M tokens ($0.0000044 per token)
-        input_cost = ((file_tree_tokens * 2 + readme_tokens) + 3000) * 0.0000011
-        output_cost = (
-            8000 * 0.0000044
-        )  # 8k just based on what I've seen (reasoning is expensive)
+        # Claude Sonnet 4.5 pricing:
+        # Input: $3 per 1M tokens ($0.000003 per token)
+        # Output: $15 per 1M tokens ($0.000015 per token)
+        input_cost = ((file_tree_tokens * 2 + readme_tokens) + 3000) * 0.000003
+        output_cost = 4000 * 0.000015
         estimated_cost = input_cost + output_cost
 
         # Format as currency string
@@ -148,13 +131,13 @@ async def generate_stream(request: Request, body: ApiRequest):
 
                 # Token count check
                 combined_content = f"{file_tree}\n{readme}"
-                token_count = o4_service.count_tokens(combined_content)
+                token_count = claude_service.count_tokens(combined_content)
 
-                if 50000 < token_count < 195000 and not body.api_key:
-                    yield f"data: {json.dumps({'error': f'File tree and README combined exceeds token limit (50,000). Current size: {token_count} tokens. This GitHub repository is too large for my wallet, but you can continue by providing your own OpenAI API key.'})}\n\n"
+                if 100000 < token_count < 180000 and not body.api_key:
+                    yield f"data: {json.dumps({'error': f'File tree and README combined exceeds token limit (100,000). Current size: {token_count} tokens. This GitHub repository is too large for free generation, but you can continue by providing your own API key.'})}\n\n"
                     return
-                elif token_count > 195000:
-                    yield f"data: {json.dumps({'error': f'Repository is too large (>195k tokens) for analysis. OpenAI o4-mini\'s max context length is 200k tokens. Current size: {token_count} tokens.'})}\n\n"
+                elif token_count > 180000:
+                    yield f"data: {json.dumps({'error': f'Repository is too large (>180k tokens) for analysis. Current size: {token_count} tokens.'})}\n\n"
                     return
 
                 # Prepare prompts
@@ -173,11 +156,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                     )
 
                 # Phase 1: Get explanation
-                yield f"data: {json.dumps({'status': 'explanation_sent', 'message': 'Sending explanation request to o4-mini...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'explanation_sent', 'message': 'Sending explanation request to Claude...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'explanation', 'message': 'Analyzing repository structure...'})}\n\n"
                 explanation = ""
-                async for chunk in o4_service.call_o4_api_stream(
+                async for chunk in claude_service.call_claude_api_stream(
                     system_prompt=first_system_prompt,
                     data={
                         "file_tree": file_tree,
@@ -185,7 +168,6 @@ async def generate_stream(request: Request, body: ApiRequest):
                         "instructions": body.instructions,
                     },
                     api_key=body.api_key,
-                    reasoning_effort="medium",
                 ):
                     explanation += chunk
                     yield f"data: {json.dumps({'status': 'explanation_chunk', 'chunk': chunk})}\n\n"
@@ -195,20 +177,18 @@ async def generate_stream(request: Request, body: ApiRequest):
                     return
 
                 # Phase 2: Get component mapping
-                yield f"data: {json.dumps({'status': 'mapping_sent', 'message': 'Sending component mapping request to o4-mini...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'mapping_sent', 'message': 'Sending component mapping request to Claude...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'mapping', 'message': 'Creating component mapping...'})}\n\n"
                 full_second_response = ""
-                async for chunk in o4_service.call_o4_api_stream(
+                async for chunk in claude_service.call_claude_api_stream(
                     system_prompt=SYSTEM_SECOND_PROMPT,
                     data={"explanation": explanation, "file_tree": file_tree},
                     api_key=body.api_key,
-                    reasoning_effort="low",
                 ):
                     full_second_response += chunk
                     yield f"data: {json.dumps({'status': 'mapping_chunk', 'chunk': chunk})}\n\n"
 
-                # i dont think i need this anymore? but keep it here for now
                 # Extract component mapping
                 start_tag = "<component_mapping>"
                 end_tag = "</component_mapping>"
@@ -219,11 +199,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                 ]
 
                 # Phase 3: Generate Mermaid diagram
-                yield f"data: {json.dumps({'status': 'diagram_sent', 'message': 'Sending diagram generation request to o4-mini...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'diagram_sent', 'message': 'Sending diagram generation request to Claude...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'diagram', 'message': 'Generating diagram...'})}\n\n"
                 mermaid_code = ""
-                async for chunk in o4_service.call_o4_api_stream(
+                async for chunk in claude_service.call_claude_api_stream(
                     system_prompt=third_system_prompt,
                     data={
                         "explanation": explanation,
@@ -231,7 +211,6 @@ async def generate_stream(request: Request, body: ApiRequest):
                         "instructions": body.instructions,
                     },
                     api_key=body.api_key,
-                    reasoning_effort="low",
                 ):
                     mermaid_code += chunk
                     yield f"data: {json.dumps({'status': 'diagram_chunk', 'chunk': chunk})}\n\n"
@@ -261,7 +240,7 @@ async def generate_stream(request: Request, body: ApiRequest):
             event_generator(),
             media_type="text/event-stream",
             headers={
-                "X-Accel-Buffering": "no",  # Hint to Nginx
+                "X-Accel-Buffering": "no",
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
             },
