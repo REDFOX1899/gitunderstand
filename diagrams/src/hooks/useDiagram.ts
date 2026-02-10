@@ -91,129 +91,168 @@ export function useDiagram(username: string, repo: string) {
         let explanation = "";
         let mapping = "";
         let diagram = "";
+        let diagramSet = false;
 
-        // Process the stream
+        // Process a single parsed SSE event
+        const handleEvent = async (data: StreamResponse) => {
+          // If we receive an error, set loading to false immediately
+          if (data.error) {
+            setState({ status: "error", error: data.error });
+            setLoading(false);
+            return "stop";
+          }
+
+          // Update state based on the message type
+          switch (data.status) {
+            case "started":
+              setState((prev) => ({
+                ...prev,
+                status: "started",
+                message: data.message,
+              }));
+              break;
+            case "explanation_sent":
+              setState((prev) => ({
+                ...prev,
+                status: "explanation_sent",
+                message: data.message,
+              }));
+              break;
+            case "explanation":
+              setState((prev) => ({
+                ...prev,
+                status: "explanation",
+                message: data.message,
+              }));
+              break;
+            case "explanation_chunk":
+              if (data.chunk) {
+                explanation += data.chunk;
+                setState((prev) => ({ ...prev, explanation }));
+              }
+              break;
+            case "mapping_sent":
+              setState((prev) => ({
+                ...prev,
+                status: "mapping_sent",
+                message: data.message,
+              }));
+              break;
+            case "mapping":
+              setState((prev) => ({
+                ...prev,
+                status: "mapping",
+                message: data.message,
+              }));
+              break;
+            case "mapping_chunk":
+              if (data.chunk) {
+                mapping += data.chunk;
+                setState((prev) => ({ ...prev, mapping }));
+              }
+              break;
+            case "diagram_sent":
+              setState((prev) => ({
+                ...prev,
+                status: "diagram_sent",
+                message: data.message,
+              }));
+              break;
+            case "diagram":
+              setState((prev) => ({
+                ...prev,
+                status: "diagram",
+                message: data.message,
+              }));
+              break;
+            case "diagram_chunk":
+              if (data.chunk) {
+                diagram += data.chunk;
+                setState((prev) => ({ ...prev, diagram }));
+              }
+              break;
+            case "complete":
+              setState({
+                status: "complete",
+                explanation: data.explanation,
+                diagram: data.diagram,
+              });
+              // Set diagram immediately to avoid race with loading=false
+              if (data.diagram) {
+                setDiagram(data.diagram);
+                diagramSet = true;
+              }
+              const date = await getLastGeneratedDate(username, repo);
+              setLastGenerated(date ?? undefined);
+              if (!hasUsedFreeGeneration) {
+                safeSetItem(
+                  "has_used_free_generation",
+                  "true",
+                );
+                setHasUsedFreeGeneration(true);
+              }
+              break;
+            case "error":
+              setState({ status: "error", error: data.error });
+              break;
+          }
+          return "continue";
+        };
+
+        // Process the stream with proper SSE line buffering
         const processStream = async () => {
+          const decoder = new TextDecoder();
+          let buffer = "";
           try {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
 
-              // Convert the chunk to text
-              const chunk = new TextDecoder().decode(value);
-              const lines = chunk.split("\n");
+              // Append decoded text to buffer (stream: true handles multi-byte chars)
+              buffer += decoder.decode(value, { stream: true });
 
-              // Process each SSE message
+              // Split on newlines, keeping incomplete last line in buffer
+              const lines = buffer.split("\n");
+              buffer = lines.pop() ?? "";
+
+              // Process each complete SSE line
               for (const line of lines) {
                 if (line.startsWith("data: ")) {
                   try {
                     const data = JSON.parse(line.slice(6)) as StreamResponse;
-
-                    // If we receive an error, set loading to false immediately
-                    if (data.error) {
-                      setState({ status: "error", error: data.error });
-                      setLoading(false);
-                      return; // Add this to stop processing
-                    }
-
-                    // Update state based on the message type
-                    switch (data.status) {
-                      case "started":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "started",
-                          message: data.message,
-                        }));
-                        break;
-                      case "explanation_sent":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "explanation_sent",
-                          message: data.message,
-                        }));
-                        break;
-                      case "explanation":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "explanation",
-                          message: data.message,
-                        }));
-                        break;
-                      case "explanation_chunk":
-                        if (data.chunk) {
-                          explanation += data.chunk;
-                          setState((prev) => ({ ...prev, explanation }));
-                        }
-                        break;
-                      case "mapping_sent":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "mapping_sent",
-                          message: data.message,
-                        }));
-                        break;
-                      case "mapping":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "mapping",
-                          message: data.message,
-                        }));
-                        break;
-                      case "mapping_chunk":
-                        if (data.chunk) {
-                          mapping += data.chunk;
-                          setState((prev) => ({ ...prev, mapping }));
-                        }
-                        break;
-                      case "diagram_sent":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "diagram_sent",
-                          message: data.message,
-                        }));
-                        break;
-                      case "diagram":
-                        setState((prev) => ({
-                          ...prev,
-                          status: "diagram",
-                          message: data.message,
-                        }));
-                        break;
-                      case "diagram_chunk":
-                        if (data.chunk) {
-                          diagram += data.chunk;
-                          setState((prev) => ({ ...prev, diagram }));
-                        }
-                        break;
-                      case "complete":
-                        setState({
-                          status: "complete",
-                          explanation: data.explanation,
-                          diagram: data.diagram,
-                        });
-                        // Set diagram immediately to avoid race with loading=false
-                        if (data.diagram) {
-                          setDiagram(data.diagram);
-                        }
-                        const date = await getLastGeneratedDate(username, repo);
-                        setLastGenerated(date ?? undefined);
-                        if (!hasUsedFreeGeneration) {
-                          safeSetItem(
-                            "has_used_free_generation",
-                            "true",
-                          );
-                          setHasUsedFreeGeneration(true);
-                        }
-                        break;
-                      case "error":
-                        setState({ status: "error", error: data.error });
-                        break;
-                    }
+                    const result = await handleEvent(data);
+                    if (result === "stop") return;
                   } catch (e) {
                     console.error("Error parsing SSE message:", e);
                   }
                 }
               }
+            }
+
+            // Process any remaining data in the buffer after stream ends
+            if (buffer.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(buffer.slice(6)) as StreamResponse;
+                await handleEvent(data);
+              } catch (e) {
+                console.error("Error parsing final SSE message:", e);
+              }
+            }
+
+            // Safety net: if the "complete" event was missed (e.g. split across
+            // chunks in a way that still failed parsing), fall back to the
+            // diagram accumulated from chunk events.
+            if (!diagramSet && diagram) {
+              const cleaned = diagram
+                .replace(/```mermaid/g, "")
+                .replace(/```/g, "")
+                .trim();
+              setDiagram(cleaned);
+              setState((prev) => ({
+                ...prev,
+                status: "complete",
+                diagram: cleaned,
+              }));
             }
           } finally {
             reader.releaseLock();
