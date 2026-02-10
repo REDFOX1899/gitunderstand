@@ -1,7 +1,11 @@
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import Anthropic
 from dotenv import load_dotenv
 from app.utils.format_message import format_user_message
 from typing import AsyncGenerator
+import tiktoken
+import aiohttp
+import json
+import os
 
 load_dotenv()
 
@@ -10,8 +14,10 @@ class ClaudeService:
     MODEL = "claude-sonnet-4-5-20250929"
 
     def __init__(self):
+        self.api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
         self.default_client = Anthropic()
-        self.async_client = AsyncAnthropic()
+        self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.base_url = "https://api.anthropic.com/v1/messages"
 
     def call_claude_api(
         self, system_prompt: str, data: dict, api_key: str | None = None
@@ -37,23 +43,59 @@ class ClaudeService:
         api_key: str | None = None,
     ) -> AsyncGenerator[str, None]:
         user_message = format_user_message(data)
-        client = AsyncAnthropic(api_key=api_key) if api_key else self.async_client
 
-        async with client.messages.stream(
-            model=self.MODEL,
-            max_tokens=8192,
-            temperature=0,
-            system=system_prompt,
-            messages=[
-                {"role": "user", "content": [{"type": "text", "text": user_message}]}
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": api_key or self.api_key,
+            "anthropic-version": "2023-06-01",
+        }
+
+        payload = {
+            "model": self.MODEL,
+            "max_tokens": 8192,
+            "temperature": 0,
+            "system": system_prompt,
+            "messages": [
+                {"role": "user", "content": user_message}
             ],
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+            "stream": True,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.base_url, headers=headers, json=payload
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"Anthropic API error: {error_text}")
+                    raise ValueError(
+                        f"Anthropic API returned status {response.status}: {error_text}"
+                    )
+
+                async for line in response.content:
+                    line = line.decode("utf-8").strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("data: "):
+                        json_str = line[6:]
+                        if json_str == "[DONE]":
+                            break
+                        try:
+                            event_data = json.loads(json_str)
+                            event_type = event_data.get("type")
+
+                            if event_type == "content_block_delta":
+                                delta = event_data.get("delta", {})
+                                if delta.get("type") == "text_delta":
+                                    text = delta.get("text", "")
+                                    if text:
+                                        yield text
+                            elif event_type == "error":
+                                error_msg = event_data.get("error", {}).get("message", "Unknown error")
+                                raise ValueError(f"Anthropic API error: {error_msg}")
+                        except json.JSONDecodeError:
+                            continue
 
     def count_tokens(self, prompt: str) -> int:
-        response = self.default_client.messages.count_tokens(
-            model=self.MODEL,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.input_tokens
+        return len(self.encoding.encode(prompt))
