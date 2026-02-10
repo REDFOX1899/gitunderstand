@@ -73,11 +73,11 @@ export default function Repo() {
               </div>
             )}
           </div>
-        ) : (
+        ) : diagram ? (
           <div className="flex w-full justify-center px-4">
             <MermaidChart chart={diagram} zoomingEnabled={zoomingEnabled} />
           </div>
-        )}
+        ) : null}
       </div>
 
       <ApiKeyDialog

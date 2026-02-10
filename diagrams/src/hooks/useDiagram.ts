@@ -190,6 +190,10 @@ export function useDiagram(username: string, repo: string) {
                           explanation: data.explanation,
                           diagram: data.diagram,
                         });
+                        // Set diagram immediately to avoid race with loading=false
+                        if (data.diagram) {
+                          setDiagram(data.diagram);
+                        }
                         const date = await getLastGeneratedDate(username, repo);
                         setLastGenerated(date ?? undefined);
                         if (!hasUsedFreeGeneration) {
