@@ -306,12 +306,13 @@ async def generate_stream(request: Request, body: ApiRequest):
                 )
 
                 # Send final result
-                yield f"data: {json.dumps({
-                    'status': 'complete',
-                    'diagram': processed_diagram,
-                    'explanation': explanation,
-                    'mapping': component_mapping_text
-                })}\n\n"
+                final_result = json.dumps({
+                    "status": "complete",
+                    "diagram": processed_diagram,
+                    "explanation": explanation,
+                    "mapping": component_mapping_text,
+                })
+                yield f"data: {final_result}\n\n"
 
             except Exception as e:
                 logger.exception("Error in generate stream")
