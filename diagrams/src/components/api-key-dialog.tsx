@@ -70,7 +70,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
                 only for generating diagrams. You can also self-host this app by
                 following the instructions in the{" "}
                 <Link
-                  href="https://github.com/ahmedkhaleel2004/gitdiagram"
+                  href="https://github.com/REDFOX1899/gitunderstand"
                   className="text-purple-600 transition-colors duration-200 hover:text-purple-500"
                 >
                   README

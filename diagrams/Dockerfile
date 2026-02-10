@@ -21,9 +21,13 @@ COPY . .
 ENV SKIP_ENV_VALIDATION=1
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build-time arg for rewrite destination (baked into Next.js config at build)
+# Build-time args baked into Next.js config/bundle at build time
 ARG GITUNDERSTAND_API_URL=https://gitunderstand-308289525742.us-central1.run.app
 ENV GITUNDERSTAND_API_URL=${GITUNDERSTAND_API_URL}
+
+# Client-side env var: NEXT_PUBLIC_ vars are inlined by Next.js at build time
+ARG NEXT_PUBLIC_API_DEV_URL=https://gitdiagram-backend-308289525742.us-central1.run.app
+ENV NEXT_PUBLIC_API_DEV_URL=${NEXT_PUBLIC_API_DEV_URL}
 
 RUN pnpm build
 

@@ -31,7 +31,7 @@ export async function generateAndCacheDiagram(
 ): Promise<GenerateApiResponse> {
   try {
     const baseUrl =
-      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://api.gitdiagram.com" // TODO: update to production gitdiagram-backend Cloud Run URL;
+      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://gitdiagram-backend-308289525742.us-central1.run.app";
     const url = new URL(`${baseUrl}/generate`);
 
     const response = await fetch(url, {
@@ -87,7 +87,7 @@ export async function modifyAndCacheDiagram(
     }
 
     const baseUrl =
-      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://api.gitdiagram.com" // TODO: update to production gitdiagram-backend Cloud Run URL;
+      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://gitdiagram-backend-308289525742.us-central1.run.app";
     const url = new URL(`${baseUrl}/modify`);
 
     const response = await fetch(url, {
@@ -136,7 +136,7 @@ export async function getCostOfGeneration(
 ): Promise<CostApiResponse> {
   try {
     const baseUrl =
-      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://api.gitdiagram.com" // TODO: update to production gitdiagram-backend Cloud Run URL;
+      process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://gitdiagram-backend-308289525742.us-central1.run.app";
     const url = new URL(`${baseUrl}/generate/cost`);
 
     const response = await fetch(url, {

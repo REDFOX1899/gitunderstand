@@ -64,7 +64,7 @@ export function useDiagram(username: string, repo: string) {
 
       try {
         const baseUrl =
-          process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://api.gitdiagram.com"; // TODO: update to production gitdiagram-backend Cloud Run URL
+          process.env.NEXT_PUBLIC_API_DEV_URL ?? "https://gitdiagram-backend-308289525742.us-central1.run.app";
         const response = await fetch(`${baseUrl}/generate/stream`, {
           method: "POST",
           headers: {

@@ -11,12 +11,12 @@ export function useStarReminder() {
     if (!hasShownStarReminder) {
       // Set a timeout to show the toast after 3 seconds
       const timeoutId = setTimeout(() => {
-        toast("Enjoying GitDiagram?", {
+        toast("Enjoying GitUnderstand Diagrams?", {
           action: {
             label: "Star ★",
             onClick: () =>
               window.open(
-                "https://github.com/ahmedkhaleel2004/gitdiagram",
+                "https://github.com/REDFOX1899/gitunderstand",
                 "_blank",
               ),
           },
