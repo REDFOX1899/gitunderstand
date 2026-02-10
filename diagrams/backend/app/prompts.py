@@ -115,12 +115,14 @@ To create the Mermaid.js diagram:
 
 1. Carefully read and analyze the provided design explanation.
 2. Identify the main components, services, and their relationships within the system.
-3. Determine the appropriate Mermaid.js diagram type to use (e.g., flowchart, sequence diagram, class diagram, architecture, etc.) based on the nature of the system described.
+3. ALWAYS use `flowchart TD` as your diagram type. This is the most reliable and well-tested Mermaid.js syntax. Do NOT use sequence diagrams, class diagrams, architecture diagrams, or other types — stick to `flowchart TD`.
 4. Create the Mermaid.js code to represent the design, ensuring that:
    a. All major components are included
    b. Relationships between components are clearly shown
    c. The diagram accurately reflects the architecture described in the explanation
    d. The layout is logical and easy to understand
+
+**When in doubt, keep it simple.** A simpler diagram that renders correctly is ALWAYS better than a complex diagram that breaks. If you are unsure about a syntax construct, use the simplest alternative.
 
 Guidelines for diagram components and relationships:
 - Use appropriate shapes for different types of components (e.g., rectangles for services, cylinders for databases, etc.)
@@ -147,19 +149,17 @@ You must include click events for components of the diagram that have been speci
 
 Your output should be valid Mermaid.js code that can be rendered into a diagram.
 
-Do not include an init declaration such as `%%{init: {'key':'etc'}}%%`. This is handled externally. Just return the diagram code.
+Do NOT include an init declaration such as `%%{init: {'key':'etc'}}%%`. This is handled externally. Including it WILL break the diagram. Just return the diagram code starting with `flowchart TD`.
 
 Your response must strictly be just the Mermaid.js code, without any additional text or explanations.
 No code fence or markdown ticks needed, simply return the Mermaid.js code.
 
-Ensure that your diagram adheres strictly to the given explanation, without adding or omitting any significant components or relationships. 
+Ensure that your diagram adheres strictly to the given explanation, without adding or omitting any significant components or relationships.
 
 For general direction, the provided example below is how you should structure your code:
 
 ```mermaid
-flowchart TD 
-    %% or graph TD, your choice
-
+flowchart TD
     %% Global entities
     A("Entity A"):::external
     %% more...
@@ -182,16 +182,50 @@ flowchart TD
     %% and a lot more...
 
     %% Styles
-    classDef frontend %%...
+    classDef frontend fill:#f0fdf4,stroke:#16a34a
     %% and a lot more...
 ```
 
-EXTREMELY Important notes on syntax!!! (PAY ATTENTION TO THIS):
-- Make sure to add colour to the diagram!!! This is extremely critical.
-- In Mermaid.js syntax, we cannot include special characters for nodes without being inside quotes! For example: `EX[/api/process (Backend)]:::api` and `API -->|calls Process()| Backend` are two examples of syntax errors. They should be `EX["/api/process (Backend)"]:::api` and `API -->|"calls Process()"| Backend` respectively. Notice the quotes. This is extremely important. Make sure to include quotes for any string that contains special characters.
-- In Mermaid.js syntax, you cannot apply a class style directly within a subgraph declaration. For example: `subgraph "Frontend Layer":::frontend` is a syntax error. However, you can apply them to nodes within the subgraph. For example: `Example["Example Node"]:::frontend` is valid, and `class Example1,Example2 frontend` is valid.
-- In Mermaid.js syntax, there cannot be spaces in the relationship label names. For example: `A -->| "example relationship" | B` is a syntax error. It should be `A -->|"example relationship"| B` 
-- In Mermaid.js syntax, you cannot give subgraphs an alias like nodes. For example: `subgraph A "Layer A"` is a syntax error. It should be `subgraph "Layer A"` 
+=== CRITICAL SYNTAX RULES (violations WILL break rendering) ===
+
+1. ALL node labels containing special characters MUST be wrapped in double quotes.
+   Every label that contains parentheses, slashes, dots, colons, hyphens, or ANY non-alphanumeric character must be quoted.
+
+   WRONG: EX[/api/process (Backend)]:::api
+   RIGHT: EX["/api/process (Backend)"]:::api
+
+   WRONG: DB[(PostgreSQL Database)]
+   RIGHT: DB[("PostgreSQL Database")]
+
+   WRONG: API[User Auth/Login]
+   RIGHT: API["User Auth/Login"]
+
+2. Edge/relationship labels must have NO spaces between the pipe characters and the label.
+
+   WRONG: A -->| "sends request" | B
+   WRONG: A -->| sends request | B
+   RIGHT: A -->|"sends request"| B
+
+   WRONG: C -.->| "optional" | D
+   RIGHT: C -.->|"optional"| D
+
+3. You CANNOT apply class styles to subgraph declarations.
+
+   WRONG: subgraph "Frontend Layer":::frontend
+   RIGHT: subgraph "Frontend Layer"
+   (Then style individual nodes inside the subgraph instead)
+
+4. You CANNOT give subgraphs an alias/ID before the title.
+
+   WRONG: subgraph FE "Frontend Layer"
+   RIGHT: subgraph "Frontend Layer"
+
+5. Do NOT include `%%{init: ...}%%` anywhere. It is handled externally.
+
+   WRONG: %%{init: {'theme': 'neutral'}}%%
+   RIGHT: (just omit it entirely)
+
+6. Make sure to add colour to the diagram using classDef and ::: syntax on nodes. This is critical for readability.
 """
 # ^^^ note: ive generated a few diagrams now and claude still writes incorrect mermaid code sometimes. in the future, refer to those generated diagrams and add important instructions to the prompt above to avoid those mistakes. examples are best.
 

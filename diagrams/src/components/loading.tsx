@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const messages = [
   "Checking if its cached...",
@@ -50,6 +51,14 @@ const getStepNumber = (status: string): number => {
   return 0;
 };
 
+const getStageLabel = (status: string): string => {
+  if (status.startsWith("diagram")) return "Generating diagram...";
+  if (status.startsWith("mapping")) return "Creating component mapping...";
+  if (status.startsWith("explanation")) return "Analyzing repository...";
+  if (status === "started") return "Starting generation...";
+  return "Preparing...";
+};
+
 const SequentialDots = () => {
   return (
     <span className="inline-flex w-8 justify-start">
@@ -85,6 +94,7 @@ export default function Loading({
   cost,
 }: LoadingProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,69 +188,96 @@ export default function Loading({
 
   const statusDisplay = getStatusDisplay();
   const reasoningMessage = renderReasoningMessage();
+  const stepNumber = getStepNumber(status);
+  const stageLabel = getStageLabel(status);
 
   return (
     <div className="mx-auto w-full max-w-4xl p-4">
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50/50 backdrop-blur-sm">
-        <div className="border-b border-stone-200 bg-cyan-50/50 px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-cyan-600">
-                {statusDisplay.text}
-              </span>
-              {statusDisplay.isReasoning && <SequentialDots />}
+        {/* Compact header bar - always visible */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex w-full items-center justify-between border-b border-stone-200 bg-cyan-50/50 px-4 py-2.5 text-left transition-colors hover:bg-cyan-50/80"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-5 items-center">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
             </div>
-            <div className="flex items-center gap-3 text-xs font-medium text-stone-500">
-              {cost && <span>Estimated cost: {cost}</span>}
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-stone-100 px-2 py-0.5">
-                  Step {getStepNumber(status)}/3
-                </span>
-                <StepDots currentStep={getStepNumber(status)} />
-              </div>
-            </div>
+            <span className="text-sm font-medium text-stone-700">
+              {stageLabel}
+            </span>
+            <SequentialDots />
           </div>
-        </div>
+          <div className="flex items-center gap-3">
+            {cost && (
+              <span className="text-xs text-stone-400">
+                ~{cost}
+              </span>
+            )}
+            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500">
+              Step {stepNumber}/3
+            </span>
+            <StepDots currentStep={stepNumber} />
+            {expanded ? (
+              <ChevronUp size={16} className="text-stone-400" />
+            ) : (
+              <ChevronDown size={16} className="text-stone-400" />
+            )}
+          </div>
+        </button>
 
-        {/* Scrollable content */}
-        <div ref={scrollRef} className="max-h-[400px] overflow-y-auto p-6">
-          <div className="flex flex-col gap-6">
-            {/* Only show reasoning message if we have some content */}
-            {reasoningMessage &&
-              statusDisplay.isReasoning &&
-              (explanation ?? mapping ?? diagram) && (
-                <div className="rounded-lg bg-cyan-50/50 p-4 text-sm text-cyan-700">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">Reasoning</p>
-                    <SequentialDots />
-                  </div>
-                  <p className="mt-2 leading-relaxed">{reasoningMessage}</p>
+        {/* Expanded content */}
+        <div
+          className="overflow-hidden transition-all duration-300 ease-in-out"
+          style={{ maxHeight: expanded ? "400px" : "0px" }}
+        >
+          <div ref={scrollRef} className="max-h-[400px] overflow-y-auto p-6">
+            <div className="flex flex-col gap-6">
+              {/* Status text */}
+              {statusDisplay.isReasoning && (
+                <div className="flex items-center gap-2 text-sm text-cyan-600">
+                  <span className="font-medium">{statusDisplay.text}</span>
+                  <SequentialDots />
                 </div>
               )}
-            {explanation && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
-                <p className="font-medium text-cyan-600">Explanation:</p>
-                <p className="mt-2 leading-relaxed">{explanation}</p>
-              </div>
-            )}
-            {mapping && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
-                <p className="font-medium text-cyan-600">Mapping:</p>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                  {mapping}
-                </pre>
-              </div>
-            )}
-            {diagram && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
-                <p className="font-medium text-cyan-600">
-                  Mermaid.js diagram:
-                </p>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                  {diagram}
-                </pre>
-              </div>
-            )}
+
+              {/* Reasoning message */}
+              {reasoningMessage &&
+                statusDisplay.isReasoning &&
+                (explanation ?? mapping ?? diagram) && (
+                  <div className="rounded-lg bg-cyan-50/50 p-4 text-sm text-cyan-700">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">Reasoning</p>
+                      <SequentialDots />
+                    </div>
+                    <p className="mt-2 leading-relaxed">{reasoningMessage}</p>
+                  </div>
+                )}
+              {explanation && (
+                <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                  <p className="font-medium text-cyan-600">Explanation:</p>
+                  <p className="mt-2 leading-relaxed">{explanation}</p>
+                </div>
+              )}
+              {mapping && (
+                <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                  <p className="font-medium text-cyan-600">Mapping:</p>
+                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    {mapping}
+                  </pre>
+                </div>
+              )}
+              {diagram && (
+                <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                  <p className="font-medium text-cyan-600">
+                    Mermaid.js diagram:
+                  </p>
+                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    {diagram}
+                  </pre>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

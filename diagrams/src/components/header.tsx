@@ -37,8 +37,8 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-8">
-        <Link href="/diagrams" className="flex items-center">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
+        <Link href="/" className="flex items-center">
           <span className="text-lg font-semibold sm:text-xl">
             <span className="text-stone-900 transition-colors duration-200 hover:text-stone-600">
               Git
@@ -46,15 +46,14 @@ export function Header() {
             <span className="text-cyan-600 transition-colors duration-200 hover:text-cyan-500">
               Understand
             </span>
-            <span className="ml-1 text-sm text-stone-400">Diagrams</span>
           </span>
         </Link>
         <nav className="flex items-center gap-3 sm:gap-6">
           <Link
-            href="/"
+            href="/diagrams"
             className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-900"
           >
-            Digest
+            Diagrams
           </Link>
           <span
             onClick={() => setIsApiKeyDialogOpen(true)}

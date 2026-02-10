@@ -73,6 +73,60 @@ async def get_generation_cost(request: Request, body: ApiRequest):
         return {"error": str(e)}
 
 
+def sanitize_mermaid_code(code: str) -> str:
+    """
+    Sanitize LLM-generated Mermaid code by fixing common syntax issues.
+    """
+    # 1. Strip any %%{init:...}%% blocks (handled externally by frontend)
+    code = re.sub(r"%%\{init:[\s\S]*?\}%%", "", code)
+
+    # 2. Fix space-in-pipe-label: -->| "text" | → -->|"text"|
+    code = re.sub(
+        r'(-->|---|-\.-|==>|-.->|--x|--o)\|\s*"([^"]*)"\s*\|',
+        r'\1|"\2"|',
+        code,
+    )
+    # Also fix unquoted labels with spaces: -->| label | → -->|"label"|
+    code = re.sub(
+        r"(-->|---|-\.-|==>|-.->|--x|--o)\|\s+([^\"|][^|]*?)\s+\|",
+        r'\1|"\2"|',
+        code,
+    )
+
+    # 3. Quote node labels containing special characters
+    #    A[some/path (thing)] → A["some/path (thing)"]
+    def quote_bracket_label(m):
+        node_id = m.group(1)
+        label = m.group(2)
+        if re.search(r'[/\\(){}@#$%^&*!<>;]', label) and not label.startswith('"'):
+            return f'{node_id}["{label}"]'
+        return m.group(0)
+
+    code = re.sub(r'(\b\w+)\[([^\]"]+)\]', quote_bracket_label, code)
+
+    def quote_paren_label(m):
+        node_id = m.group(1)
+        label = m.group(2)
+        if re.search(r'[/\\\[\]{}@#$%^&*!<>;]', label) and not label.startswith('"'):
+            return f'{node_id}("{label}")'
+        return m.group(0)
+
+    code = re.sub(r'(\b\w+)\(([^)"]+)\)', quote_paren_label, code)
+
+    # 4. Remove :::className from subgraph declarations
+    #    subgraph "Name":::style → subgraph "Name"
+    code = re.sub(r'(subgraph\s+"[^"]*"):::\w+', r"\1", code)
+    code = re.sub(r"(subgraph\s+\S+):::\w+", r"\1", code)
+
+    # 5. Fix subgraph alias: subgraph ID "Name" → subgraph "Name"
+    code = re.sub(r'subgraph\s+\w+\s+"([^"]+)"', r'subgraph "\1"', code)
+
+    # 6. Remove leading/trailing empty lines
+    code = code.strip()
+
+    return code
+
+
 def process_click_events(diagram: str, username: str, repo: str, branch: str) -> str:
     """
     Process click events in Mermaid diagram to include full GitHub URLs.
@@ -217,6 +271,7 @@ async def generate_stream(request: Request, body: ApiRequest):
 
                 # Process final diagram
                 mermaid_code = mermaid_code.replace("```mermaid", "").replace("```", "")
+                mermaid_code = sanitize_mermaid_code(mermaid_code)
                 if "BAD_INSTRUCTIONS" in mermaid_code:
                     yield f"data: {json.dumps({'error': 'Invalid or unclear instructions provided'})}\n\n"
                     return

@@ -25,8 +25,13 @@ const config = {
           destination: "https://us.i.posthog.com/decide",
         },
       ],
-      // No afterFiles rewrites needed
-      afterFiles: [],
+      // Proxy /api/* to GitUnderstand backend
+      afterFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${process.env.GITUNDERSTAND_API_URL ?? "http://localhost:8080"}/api/:path*`,
+        },
+      ],
       // Fallback: any route not handled by Next.js → existing GitUnderstand FastAPI
       fallback: [
         {
