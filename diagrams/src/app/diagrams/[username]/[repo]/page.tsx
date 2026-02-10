@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useStarReminder } from "~/hooks/useStarReminder";
 
 export default function Repo() {
-  const [zoomingEnabled, setZoomingEnabled] = useState(false);
+  const [zoomingEnabled, setZoomingEnabled] = useState(true);
   const params = useParams<{ username: string; repo: string }>();
 
   // Use the star reminder hook
@@ -63,7 +63,7 @@ export default function Repo() {
           />
         ) : error || state.error ? (
           <div className="mt-12 text-center">
-            <p className="max-w-4xl text-lg font-medium text-purple-600">
+            <p className="max-w-4xl text-lg font-medium text-red-600">
               {error || state.error}
             </p>
             {(error?.includes("API key") ||

@@ -35,14 +35,14 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="border-[3px] border-black bg-purple-200 p-6 shadow-[8px_8px_0_0_#000000] sm:max-w-md">
+      <DialogContent className="border border-stone-200 bg-white p-6 shadow-xl sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-black">
+          <DialogTitle className="text-xl font-bold text-stone-900">
             Enter Anthropic API Key
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="text-sm">
+          <div className="text-sm text-stone-600">
             GitDiagram offers infinite free diagram generations! You can also
             provide an Anthropic API key to generate diagrams at your own cost.
             The key will be stored locally in your browser.
@@ -51,24 +51,24 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
             <span className="font-medium">Get your Anthropic API key </span>
             <Link
               href="https://console.anthropic.com/settings/keys"
-              className="font-medium text-purple-600 transition-colors duration-200 hover:text-purple-500"
+              className="font-medium text-cyan-600 transition-colors duration-200 hover:text-cyan-700"
             >
               here
             </Link>
             .
           </div>
           <details className="group text-sm [&>summary:focus-visible]:outline-none">
-            <summary className="cursor-pointer font-medium text-purple-700 hover:text-purple-600">
+            <summary className="cursor-pointer font-medium text-cyan-700 hover:text-cyan-600">
               Data storage disclaimer
             </summary>
             <div className="animate-accordion-down mt-2 space-y-2 overflow-hidden pl-2">
-              <p>
+              <p className="text-stone-600">
                 Your API key will be stored locally in your browser and used
                 only for generating diagrams. You can also self-host this app by
                 following the instructions in the{" "}
                 <Link
                   href="https://github.com/REDFOX1899/gitunderstand"
-                  className="text-purple-600 transition-colors duration-200 hover:text-purple-500"
+                  className="text-cyan-600 transition-colors duration-200 hover:text-cyan-700"
                 >
                   README
                 </Link>
@@ -81,14 +81,14 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
             placeholder="sk-ant-..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className="flex-1 rounded-md border-[3px] border-black px-3 py-2 text-base font-bold shadow-[4px_4px_0_0_#000000] placeholder:text-base placeholder:font-normal placeholder:text-gray-700"
+            className="flex-1 rounded-md border border-stone-300 px-3 py-2 text-base font-bold placeholder:text-base placeholder:font-normal placeholder:text-stone-400 focus:ring-2 focus:ring-cyan-500"
             required
           />
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={handleClear}
-              className="text-sm text-purple-600 hover:text-purple-500"
+              className="text-sm text-cyan-600 hover:text-cyan-700"
             >
               Clear
             </button>
@@ -96,14 +96,14 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
               <Button
                 type="button"
                 onClick={onClose}
-                className="border-[3px] border-black bg-gray-200 px-4 py-2 text-black shadow-[4px_4px_0_0_#000000] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-gray-300"
+                className="border border-stone-300 bg-stone-100 px-4 py-2 text-stone-700 shadow-sm transition-colors hover:bg-stone-200"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={!apiKey.startsWith("sk-ant-")}
-                className="border-[3px] border-black bg-purple-400 px-4 py-2 text-black shadow-[4px_4px_0_0_#000000] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-purple-300 disabled:opacity-50"
+                className="bg-cyan-600 px-4 py-2 text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-50"
               >
                 Save Key
               </Button>

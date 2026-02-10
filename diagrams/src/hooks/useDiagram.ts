@@ -42,7 +42,8 @@ interface StreamResponse {
 export function useDiagram(username: string, repo: string) {
   const [diagram, setDiagram] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [checkingCache, setCheckingCache] = useState<boolean>(true);
   const [lastGenerated, setLastGenerated] = useState<Date | undefined>();
   const [cost, setCost] = useState<string>("");
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
@@ -250,7 +251,7 @@ export function useDiagram(username: string, repo: string) {
   }, [state.status, state.diagram, username, repo, state.explanation]);
 
   const getDiagram = useCallback(async () => {
-    setLoading(true);
+    setCheckingCache(true);
     setError("");
     setCost("");
 
@@ -263,8 +264,13 @@ export function useDiagram(username: string, repo: string) {
         setDiagram(cached);
         const date = await getLastGeneratedDate(username, repo);
         setLastGenerated(date ?? undefined);
+        setCheckingCache(false);
         return;
       }
+
+      // No cache hit — now show loading spinner for generation
+      setCheckingCache(false);
+      setLoading(true);
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
       // Only check for API key if we need to generate a new diagram
@@ -306,6 +312,7 @@ export function useDiagram(username: string, repo: string) {
       console.error("Error in getDiagram:", error);
       setError("Something went wrong. Please try again later.");
     } finally {
+      setCheckingCache(false);
       setLoading(false);
     }
   }, [username, repo, generateDiagram]);
@@ -469,7 +476,7 @@ export function useDiagram(username: string, repo: string) {
   return {
     diagram,
     error,
-    loading,
+    loading: loading || checkingCache,
     lastGenerated,
     cost,
     handleModify,
@@ -482,5 +489,6 @@ export function useDiagram(username: string, repo: string) {
     handleOpenApiKeyDialog,
     handleExportImage,
     state,
+    checkingCache,
   };
 }

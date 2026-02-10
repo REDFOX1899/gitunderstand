@@ -15,14 +15,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-purple-100 group-[.toaster]:text-foreground group-[.toaster]:shadow-[3px_3px_0_0_#000000] group-[.toaster]:border-[2px] group-[.toaster]:border-black group-[.toaster]:rounded-md group-[.toaster]:p-3 group-[.toaster]:flex group-[.toaster]:items-center group-[.toaster]:justify-between group-[.toaster]:gap-4",
+            "group toast group-[.toaster]:bg-white group-[.toaster]:text-foreground group-[.toaster]:shadow-md group-[.toaster]:border group-[.toaster]:border-stone-200 group-[.toaster]:rounded-lg group-[.toaster]:p-3 group-[.toaster]:flex group-[.toaster]:items-center group-[.toaster]:justify-between group-[.toaster]:gap-4",
           title:
             "group-[.toast]:font-bold group-[.toast]:text-base group-[.toast]:m-0",
           description: "group-[.toast]:text-muted-foreground",
           actionButton:
-            "group-[.toast]:!bg-purple-200 group-[.toast]:!border-[2px] group-[.toast]:!border-solid group-[.toast]:!border-black group-[.toast]:!py-[14px] group-[.toast]:!px-6 group-[.toast]:!text-lg group-[.toast]:!text-black group-[.toast]:hover:!bg-purple-300 group-[.toast]:!transition-colors",
+            "group-[.toast]:!bg-cyan-600 group-[.toast]:!border group-[.toast]:!border-solid group-[.toast]:!border-cyan-700 group-[.toast]:!py-[14px] group-[.toast]:!px-6 group-[.toast]:!text-lg group-[.toast]:!text-white group-[.toast]:hover:!bg-cyan-700 group-[.toast]:!transition-colors group-[.toast]:!rounded-md",
           cancelButton:
-            "group-[.toast]:text-neutral-500 group-[.toast]:underline hover:group-[.toast]:text-neutral-700",
+            "group-[.toast]:text-stone-500 group-[.toast]:underline hover:group-[.toast]:text-stone-700",
         },
         duration: 5000,
       }}

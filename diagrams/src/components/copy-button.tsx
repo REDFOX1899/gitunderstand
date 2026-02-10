@@ -18,7 +18,7 @@ export function CopyButton({ onClick }: CopyButtonProps) {
   const handleClick = () => {
     onClick();
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -27,7 +27,7 @@ export function CopyButton({ onClick }: CopyButtonProps) {
         <TooltipTrigger asChild>
           <Button
             onClick={handleClick}
-            className="border-[3px] border-black bg-purple-400 p-4 px-4 text-base text-black shadow-[4px_4px_0_0_#000000] transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:transform hover:bg-purple-400 sm:p-6 sm:px-6 sm:text-lg"
+            className="border border-stone-300 bg-cyan-600 p-4 px-4 text-base text-white shadow-sm transition-colors hover:bg-cyan-700 hover:shadow-md sm:p-6 sm:px-6 sm:text-lg"
           >
             {copied ? (
               <>

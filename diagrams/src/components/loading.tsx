@@ -54,9 +54,9 @@ const SequentialDots = () => {
   return (
     <span className="inline-flex w-8 justify-start">
       <span className="flex gap-0.5">
-        <span className="h-1 w-1 animate-[dot1_1.5s_steps(1)_infinite] rounded-full bg-purple-500" />
-        <span className="h-1 w-1 animate-[dot2_1.5s_steps(1)_infinite] rounded-full bg-purple-500" />
-        <span className="h-1 w-1 animate-[dot3_1.5s_steps(1)_infinite] rounded-full bg-purple-500" />
+        <span className="h-1 w-1 animate-[dot1_1.5s_steps(1)_infinite] rounded-full bg-cyan-500" />
+        <span className="h-1 w-1 animate-[dot2_1.5s_steps(1)_infinite] rounded-full bg-cyan-500" />
+        <span className="h-1 w-1 animate-[dot3_1.5s_steps(1)_infinite] rounded-full bg-cyan-500" />
       </span>
     </span>
   );
@@ -69,7 +69,7 @@ const StepDots = ({ currentStep }: { currentStep: number }) => {
         <div
           key={step}
           className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
-            step <= currentStep ? "bg-purple-500" : "bg-purple-200"
+            step <= currentStep ? "bg-cyan-500" : "bg-stone-200"
           }`}
         />
       ))}
@@ -181,19 +181,19 @@ export default function Loading({
 
   return (
     <div className="mx-auto w-full max-w-4xl p-4">
-      <div className="overflow-hidden rounded-xl border-2 border-purple-200 bg-purple-50/30 backdrop-blur-sm">
-        <div className="border-b border-purple-100 bg-purple-100/50 px-6 py-3">
+      <div className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50/50 backdrop-blur-sm">
+        <div className="border-b border-stone-200 bg-cyan-50/50 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-purple-500">
+              <span className="text-sm font-medium text-cyan-600">
                 {statusDisplay.text}
               </span>
               {statusDisplay.isReasoning && <SequentialDots />}
             </div>
-            <div className="flex items-center gap-3 text-xs font-medium text-purple-500">
+            <div className="flex items-center gap-3 text-xs font-medium text-stone-500">
               {cost && <span>Estimated cost: {cost}</span>}
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-purple-100 px-2 py-0.5">
+                <span className="rounded-full bg-stone-100 px-2 py-0.5">
                   Step {getStepNumber(status)}/3
                 </span>
                 <StepDots currentStep={getStepNumber(status)} />
@@ -209,7 +209,7 @@ export default function Loading({
             {reasoningMessage &&
               statusDisplay.isReasoning &&
               (explanation ?? mapping ?? diagram) && (
-                <div className="rounded-lg bg-purple-100/50 p-4 text-sm text-purple-500">
+                <div className="rounded-lg bg-cyan-50/50 p-4 text-sm text-cyan-700">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">Reasoning</p>
                     <SequentialDots />
@@ -218,22 +218,22 @@ export default function Loading({
                 </div>
               )}
             {explanation && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-gray-600">
-                <p className="font-medium text-purple-500">Explanation:</p>
+              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                <p className="font-medium text-cyan-600">Explanation:</p>
                 <p className="mt-2 leading-relaxed">{explanation}</p>
               </div>
             )}
             {mapping && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-gray-600">
-                <p className="font-medium text-purple-500">Mapping:</p>
+              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                <p className="font-medium text-cyan-600">Mapping:</p>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">
                   {mapping}
                 </pre>
               </div>
             )}
             {diagram && (
-              <div className="rounded-lg bg-white/50 p-4 text-sm text-gray-600">
-                <p className="font-medium text-purple-500">
+              <div className="rounded-lg bg-white/50 p-4 text-sm text-stone-600">
+                <p className="font-medium text-cyan-600">
                   Mermaid.js diagram:
                 </p>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap leading-relaxed">

@@ -2,8 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import mermaid from "mermaid";
-// Remove the direct import
-// import svgPanZoom from "svg-pan-zoom";
 
 interface MermaidChartProps {
   chart: string;
@@ -17,6 +15,7 @@ const MermaidChart = ({ chart, zoomingEnabled = true }: MermaidChartProps) => {
     mermaid.initialize({
       startOnLoad: true,
       theme: "neutral",
+      securityLevel: "loose",
       htmlLabels: true,
       flowchart: {
         htmlLabels: true,
@@ -33,37 +32,40 @@ const MermaidChart = ({ chart, zoomingEnabled = true }: MermaidChartProps) => {
           transform: scale(1.05);
           cursor: pointer;
         }
-        .clickable:hover > * {
-          filter: brightness(0.85);
-        }
       `,
     });
 
     const initializePanZoom = async () => {
       const svgElement = containerRef.current?.querySelector("svg");
-      if (svgElement && zoomingEnabled) {
+      if (!svgElement) return;
+
+      // Post-process all links to open in new tabs
+      const links = svgElement.querySelectorAll("a");
+      links.forEach((link) => {
+        link.setAttribute("target", "_blank");
+        link.setAttribute("rel", "noopener noreferrer");
+      });
+
+      if (zoomingEnabled) {
         // Remove any max-width constraints
         svgElement.style.maxWidth = "none";
         svgElement.style.width = "100%";
         svgElement.style.height = "100%";
 
-        if (zoomingEnabled) {
-          try {
-            // Dynamically import svg-pan-zoom only when needed in the browser
-            const svgPanZoom = (await import("svg-pan-zoom")).default;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            svgPanZoom(svgElement, {
-              zoomEnabled: true,
-              controlIconsEnabled: true,
-              fit: true,
-              center: true,
-              minZoom: 0.1,
-              maxZoom: 10,
-              zoomScaleSensitivity: 0.3,
-            });
-          } catch (error) {
-            console.error("Failed to load svg-pan-zoom:", error);
-          }
+        try {
+          const svgPanZoom = (await import("svg-pan-zoom")).default;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          svgPanZoom(svgElement, {
+            zoomEnabled: true,
+            controlIconsEnabled: true,
+            fit: true,
+            center: true,
+            minZoom: 0.1,
+            maxZoom: 10,
+            zoomScaleSensitivity: 0.3,
+          });
+        } catch (error) {
+          console.error("Failed to load svg-pan-zoom:", error);
         }
       }
     };
@@ -77,21 +79,26 @@ const MermaidChart = ({ chart, zoomingEnabled = true }: MermaidChartProps) => {
     return () => {
       // Cleanup not needed with dynamic import approach
     };
-  }, [chart, zoomingEnabled]); // Added zoomingEnabled to dependencies
+  }, [chart, zoomingEnabled]);
 
   return (
     <div
       ref={containerRef}
-      className={`w-full max-w-full p-4 ${zoomingEnabled ? "h-[600px]" : ""}`}
+      className={`w-full max-w-full p-4 ${zoomingEnabled ? "h-[75vh]" : ""}`}
     >
       <div
         key={`${chart}-${zoomingEnabled}`}
         className={`mermaid h-full ${
-          zoomingEnabled ? "rounded-lg border-2 border-black" : ""
+          zoomingEnabled ? "rounded-xl border border-stone-200" : ""
         }`}
       >
         {chart}
       </div>
+      {zoomingEnabled && (
+        <p className="mt-2 text-center text-xs text-stone-400">
+          Scroll to zoom · Click and drag to pan
+        </p>
+      )}
     </div>
   );
 };
