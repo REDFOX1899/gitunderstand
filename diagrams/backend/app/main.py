@@ -13,13 +13,17 @@ import os
 app = FastAPI()
 
 
-origins = ["http://localhost:3000", "https://githubunderstand.com", "https://gitdiagram.com"]
+origins = [
+    "http://localhost:3000",
+    "https://gitunderstand.com",
+    "https://githubunderstand-web-308289525742.us-central1.run.app",
+]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

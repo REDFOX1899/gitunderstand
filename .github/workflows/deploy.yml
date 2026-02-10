@@ -21,6 +21,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       diagrams: ${{ steps.filter.outputs.diagrams }}
+      diagrams-backend: ${{ steps.filter.outputs.diagrams-backend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -35,6 +36,9 @@ jobs:
               - 'requirements*.txt'
             diagrams:
               - 'diagrams/**'
+              - '!diagrams/backend/**'
+            diagrams-backend:
+              - 'diagrams/backend/**'
 
   # Test the Python backend (runs on backend changes or PRs)
   test-backend:
@@ -193,3 +197,56 @@ jobs:
         run: |
           URL=$(gcloud run services describe githubunderstand-web --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format "value(status.url)")
           echo "::notice::Diagrams frontend deployed to $URL"
+
+  # Deploy the diagrams backend (FastAPI) to Cloud Run
+  deploy-diagrams-backend:
+    needs: [changes]
+    if: github.event_name == 'push' && needs.changes.outputs.diagrams-backend == 'true'
+    runs-on: ubuntu-latest
+    environment: gitunderstand
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        working-directory: diagrams/backend
+        run: |
+          docker build \
+            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitdiagram-backend:${{ github.sha }}" \
+            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitdiagram-backend:latest" \
+            .
+          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitdiagram-backend:${{ github.sha }}"
+          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitdiagram-backend:latest"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy gitdiagram-backend \
+            --image "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitdiagram-backend:${{ github.sha }}" \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8000 \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --timeout 300 \
+            --set-secrets "OPENAI_API_KEY=openai-api-key:latest" \
+            --set-env-vars "ENVIRONMENT=production" \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Show URL
+        run: |
+          URL=$(gcloud run services describe gitdiagram-backend --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format "value(status.url)")
+          echo "::notice::Diagrams backend deployed to $URL"
