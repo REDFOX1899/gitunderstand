@@ -26,11 +26,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-origins = [
-    "http://localhost:3000",
-    "https://gitunderstand.com",
-    "https://githubunderstand-web-308289525742.us-central1.run.app",
-]
+_default_origins = "https://gitunderstand.com,https://www.gitunderstand.com,http://localhost:3000"
+origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,

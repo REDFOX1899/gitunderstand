@@ -1,4 +1,4 @@
-# GitDiagram Deployment Plan — githubunderstand.com/diagrams
+# GitDiagram Deployment Plan — gitunderstand.com/diagrams
 
 ## Architecture Overview
 
@@ -7,7 +7,7 @@ GitDiagram has two components:
 - **Backend**: FastAPI Python server (handles AI diagram generation via OpenAI o4-mini)
 - **Database**: PostgreSQL with Drizzle ORM
 
-Your deployment target: GCP, served at `githubunderstand.com/diagrams`
+Your deployment target: GCP, served at `gitunderstand.com/diagrams`
 
 ---
 
@@ -19,8 +19,8 @@ Before the agents can execute, you need to provide:
 1. **OpenAI API Key** — GitDiagram uses OpenAI o4-mini for diagram generation
 2. **GitHub Personal Access Token** — for fetching repo file trees and README content
 3. **GCP Project ID** — which GCP project to deploy into
-4. **Current infra details** — how is githubunderstand.com currently deployed? (Cloud Run? GKE? Compute Engine? App Engine?) This determines how we integrate the `/diagrams` sub-path
-5. **Domain/DNS setup** — who manages DNS for githubunderstand.com? (Cloud DNS, Cloudflare, etc.)
+4. **Current infra details** — how is gitunderstand.com currently deployed? (Cloud Run? GKE? Compute Engine? App Engine?) This determines how we integrate the `/diagrams` sub-path
+5. **Domain/DNS setup** — who manages DNS for gitunderstand.com? (Cloud DNS, Cloudflare, etc.)
 6. **Database preference** — use Cloud SQL (PostgreSQL), or an existing Postgres instance?
 
 ### Nice-to-Have
@@ -42,7 +42,7 @@ Before the agents can execute, you need to provide:
 - Rebrand/repath: change all routes from `/` root to `/diagrams` sub-path
 - Update `next.config.js` with `basePath: '/diagrams'`
 - Update all internal links, API calls, and asset paths
-- Modify backend CORS settings to allow `githubunderstand.com`
+- Modify backend CORS settings to allow `gitunderstand.com`
 - Update any hardcoded domain references in prompts, metadata, OG tags
 - Remove or adapt analytics (PostHog) integration
 
@@ -63,14 +63,14 @@ Before the agents can execute, you need to provide:
 - Build Next.js with `basePath: '/diagrams'` and production env vars
 - Deploy to Cloud Run (or integrate with existing hosting)
 - Set `NEXT_PUBLIC_API_URL` to point to backend Cloud Run service
-- Configure the reverse proxy / load balancer to route `githubunderstand.com/diagrams/*` to this service
+- Configure the reverse proxy / load balancer to route `gitunderstand.com/diagrams/*` to this service
 
 ### Phase 5: Routing & DNS
 - Configure your existing load balancer / reverse proxy:
-  - `githubunderstand.com/diagrams/*` → GitDiagram frontend service
-  - `githubunderstand.com/api/diagrams/*` → GitDiagram backend service (or use internal service-to-service)
+  - `gitunderstand.com/diagrams/*` → GitDiagram frontend service
+  - `gitunderstand.com/api/diagrams/*` → GitDiagram backend service (or use internal service-to-service)
 - If using Cloud Run with a shared load balancer, add URL map rules
-- SSL certificate should already cover `githubunderstand.com`
+- SSL certificate should already cover `gitunderstand.com`
 
 ### Phase 6: Testing & Launch
 - End-to-end test: enter a GitHub repo URL → get diagram
@@ -121,16 +121,16 @@ Step 2: Start Claude Code in your repo root
 
 Step 3: Ask the repo-analyzer agent to analyze and adapt
   > "Use the repo-analyzer agent to analyze the gitdiagram code in ./diagrams 
-     and adapt it to work under the /diagrams basePath for githubunderstand.com"
+     and adapt it to work under the /diagrams basePath for gitunderstand.com"
 
 Step 4: Provide your env vars when prompted
 
 Step 5: Ask the gcp-deployer agent to deploy
   > "Use the gcp-deployer agent to deploy the diagrams backend and frontend 
-     to GCP Cloud Run and configure routing for githubunderstand.com/diagrams"
+     to GCP Cloud Run and configure routing for gitunderstand.com/diagrams"
 
 Step 6: Test and iterate
-  > "Test the deployment at githubunderstand.com/diagrams"
+  > "Test the deployment at gitunderstand.com/diagrams"
 ```
 
 ---

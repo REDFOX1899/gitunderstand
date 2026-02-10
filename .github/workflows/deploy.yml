@@ -169,16 +169,16 @@ jobs:
         working-directory: diagrams
         run: |
           docker build \
-            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/githubunderstand-web:${{ github.sha }}" \
-            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/githubunderstand-web:latest" \
+            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitunderstand-web:${{ github.sha }}" \
+            --tag "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitunderstand-web:latest" \
             .
-          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/githubunderstand-web:${{ github.sha }}"
-          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/githubunderstand-web:latest"
+          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitunderstand-web:${{ github.sha }}"
+          docker push "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitunderstand-web:latest"
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy githubunderstand-web \
-            --image "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/githubunderstand-web:${{ github.sha }}" \
+          gcloud run deploy gitunderstand-web \
+            --image "us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/gitunderstand/gitunderstand-web:${{ github.sha }}" \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -195,7 +195,7 @@ jobs:
 
       - name: Show URL
         run: |
-          URL=$(gcloud run services describe githubunderstand-web --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format "value(status.url)")
+          URL=$(gcloud run services describe gitunderstand-web --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format "value(status.url)")
           echo "::notice::Diagrams frontend deployed to $URL"
 
   # Test the diagrams backend (runs on diagrams-backend changes or PRs)
@@ -266,7 +266,7 @@ jobs:
             --max-instances 5 \
             --timeout 300 \
             --add-cloudsql-instances=gitunderstand:us-central1:gitdiagram-db \
-            --set-secrets "ANTHROPIC_API_KEY=claude-api-key:latest" \
+            --set-secrets "ANTHROPIC_API_KEY=claude-api-key:latest,GITHUB_PAT=github-pat:latest" \
             --set-env-vars "^@^ENVIRONMENT=production@ALLOWED_ORIGINS=https://gitunderstand.com,https://www.gitunderstand.com,http://localhost:3000" \
             --project ${{ env.PROJECT_ID }}
 

@@ -49,7 +49,7 @@ class OpenRouterO3Service:
 
         completion = client.chat.completions.create(
             extra_headers={
-                "HTTP-Referer": "https://githubunderstand.com",  # Optional. Site URL for rankings on openrouter.ai.
+                "HTTP-Referer": "https://gitunderstand.com",  # Optional. Site URL for rankings on openrouter.ai.
                 "X-Title": "gitdiagram",  # Optional. Site title for rankings on openrouter.ai.
             },
             model="openai/o3-mini",  # Can be configured as needed
@@ -89,7 +89,7 @@ class OpenRouterO3Service:
         user_message = format_user_message(data)
 
         headers = {
-            "HTTP-Referer": "https://githubunderstand.com",
+            "HTTP-Referer": "https://gitunderstand.com",
             "X-Title": "gitdiagram",
             "Authorization": f"Bearer {api_key or self.default_client.api_key}",
             "Content-Type": "application/json",

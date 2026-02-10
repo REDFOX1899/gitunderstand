@@ -1,11 +1,11 @@
 ---
-description: Deploy gitdiagram as a sub-path feature at githubunderstand.com/diagrams — clones repo, analyzes, adapts, and deploys to GCP
+description: Deploy gitdiagram as a sub-path feature at gitunderstand.com/diagrams — clones repo, analyzes, adapts, and deploys to GCP
 argument-hint: "<phase: clone|analyze|adapt|deploy-backend|deploy-frontend|routing|full>"
 ---
 
 ## Mission
 
-Execute the gitdiagram deployment pipeline for githubunderstand.com/diagrams. This command orchestrates the full workflow across phases.
+Execute the gitdiagram deployment pipeline for gitunderstand.com/diagrams. This command orchestrates the full workflow across phases.
 
 ## Phases
 
@@ -29,7 +29,7 @@ Delegate to the **repo-analyzer** agent:
 ### `adapt` — Modify code for sub-path deployment
 Delegate to the **repo-analyzer** agent:
 - Add `basePath: '/diagrams'` to `next.config.js`
-- Update all domain references from `gitdiagram.com` to `githubunderstand.com/diagrams`
+- Update all domain references from `gitdiagram.com` to `gitunderstand.com/diagrams`
 - Update backend CORS origins
 - Update metadata, OG tags, site title
 - Create production `.env.production` template
@@ -51,7 +51,7 @@ Delegate to the **gcp-deployer** agent:
 
 ### `routing` — Configure load balancer routing
 Delegate to the **gcp-deployer** agent:
-- Inspect current routing for githubunderstand.com
+- Inspect current routing for gitunderstand.com
 - Add URL map rules for `/diagrams/*`
 - Verify end-to-end connectivity
 
@@ -65,7 +65,7 @@ Before starting, confirm the user has:
 - [ ] OpenAI API Key
 - [ ] GitHub Personal Access Token
 - [ ] GCP Project configured (`gcloud config get-value project`)
-- [ ] Existing infra details for githubunderstand.com
+- [ ] Existing infra details for gitunderstand.com
 - [ ] Database preference (new Cloud SQL or existing)
 
 ## Error Handling

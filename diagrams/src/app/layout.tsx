@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "GitUnderstand - Repository Analysis & Diagrams",
   description:
     "Turn any GitHub repository into an LLM-friendly digest and interactive diagram. Analyze code architecture, generate summaries, and chat with AI about any codebase.",
-  metadataBase: new URL("https://githubunderstand.com"),
+  metadataBase: new URL("https://gitunderstand.com"),
   keywords: [
     "github",
     "repository analysis",
@@ -24,12 +24,12 @@ export const metadata: Metadata = {
     "interactive diagram",
     "LLM",
     "AI code analysis",
-    "githubunderstand",
+    "gitunderstand",
   ],
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://githubunderstand.com",
+    url: "https://gitunderstand.com",
     title: "GitUnderstand - Repository Analysis & Diagrams",
     description:
       "Turn any GitHub repository into an LLM-friendly digest and interactive diagram.",
