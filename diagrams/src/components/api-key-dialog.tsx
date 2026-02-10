@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { safeGetItem, safeRemoveItem } from "~/lib/safe-storage";
 
 interface ApiKeyDialogProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
   const [apiKey, setApiKey] = useState<string>("");
 
   useEffect(() => {
-    const storedKey = localStorage.getItem("anthropic_key");
+    const storedKey = safeGetItem("anthropic_key");
     if (storedKey) {
       setApiKey(storedKey);
     }
@@ -29,7 +30,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
   };
 
   const handleClear = () => {
-    localStorage.removeItem("anthropic_key");
+    safeRemoveItem("anthropic_key");
     setApiKey("");
   };
 

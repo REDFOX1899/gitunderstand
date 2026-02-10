@@ -6,6 +6,7 @@ import {
 import { getLastGeneratedDate } from "~/app/_actions/repo";
 import { getCostOfGeneration } from "~/lib/fetch-backend";
 import { exampleRepos } from "~/lib/exampleRepos";
+import { safeGetItem, safeSetItem } from "~/lib/safe-storage";
 
 interface StreamState {
   status:
@@ -52,7 +53,7 @@ export function useDiagram(username: string, repo: string) {
   const [hasUsedFreeGeneration, setHasUsedFreeGeneration] = useState<boolean>(
     () => {
       if (typeof window === "undefined") return false;
-      return localStorage.getItem("has_used_free_generation") === "true";
+      return safeGetItem("has_used_free_generation") === "true";
     },
   );
 
@@ -75,7 +76,7 @@ export function useDiagram(username: string, repo: string) {
             username,
             repo,
             instructions,
-            api_key: localStorage.getItem("anthropic_key") ?? undefined,
+            api_key: safeGetItem("anthropic_key") ?? undefined,
             github_pat: githubPat,
           }),
         });
@@ -197,7 +198,7 @@ export function useDiagram(username: string, repo: string) {
                         const date = await getLastGeneratedDate(username, repo);
                         setLastGenerated(date ?? undefined);
                         if (!hasUsedFreeGeneration) {
-                          localStorage.setItem(
+                          safeSetItem(
                             "has_used_free_generation",
                             "true",
                           );
@@ -237,7 +238,7 @@ export function useDiagram(username: string, repo: string) {
   useEffect(() => {
     if (state.status === "complete" && state.diagram) {
       // Cache the completed diagram with the usedOwnKey flag
-      const hasApiKey = !!localStorage.getItem("anthropic_key");
+      const hasApiKey = !!safeGetItem("anthropic_key");
       void cacheDiagramAndExplanation(
         username,
         repo,
@@ -262,7 +263,7 @@ export function useDiagram(username: string, repo: string) {
     try {
       // Check cache first - always allow access to cached diagrams
       const cached = await getCachedDiagram(username, repo);
-      const github_pat = localStorage.getItem("github_pat");
+      const github_pat = safeGetItem("github_pat");
 
       if (cached) {
         setDiagram(cached);
@@ -361,7 +362,7 @@ export function useDiagram(username: string, repo: string) {
     setError("");
     setCost("");
     try {
-      const github_pat = localStorage.getItem("github_pat");
+      const github_pat = safeGetItem("github_pat");
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
       // const storedApiKey = localStorage.getItem("anthropic_key");
@@ -455,10 +456,10 @@ export function useDiagram(username: string, repo: string) {
     setError("");
 
     // Store the key first
-    localStorage.setItem("anthropic_key", apiKey);
+    safeSetItem("anthropic_key", apiKey);
 
     // Then generate diagram using stored key
-    const github_pat = localStorage.getItem("github_pat");
+    const github_pat = safeGetItem("github_pat");
     try {
       await generateDiagram("", github_pat ?? undefined);
     } catch (error) {

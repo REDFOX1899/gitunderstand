@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { safeGetItem, safeSetItem } from "~/lib/safe-storage";
 
 export function useStarReminder() {
   useEffect(() => {
     // Check if we've already shown the toast
-    const hasShownStarReminder = localStorage.getItem("hasShownStarReminder");
+    const hasShownStarReminder = safeGetItem("hasShownStarReminder");
 
     if (!hasShownStarReminder) {
       // Set a timeout to show the toast after 3 seconds
@@ -25,7 +26,7 @@ export function useStarReminder() {
         });
 
         // Set flag in localStorage to prevent showing again
-        localStorage.setItem("hasShownStarReminder", "true");
+        safeSetItem("hasShownStarReminder", "true");
       }, 5000);
 
       // Clean up the timeout if the component unmounts

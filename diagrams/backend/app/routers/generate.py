@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
-from dotenv import load_dotenv
 from app.services.github_service import GitHubService
 from app.services.claude_service import ClaudeService
 from app.prompts import (
@@ -11,33 +10,51 @@ from app.prompts import (
 )
 from anthropic._exceptions import RateLimitError
 from pydantic import BaseModel
-from functools import lru_cache
+import httpx
 import re
 import json
 import asyncio
+import time
+import logging
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/generate", tags=["Claude"])
 
 # Initialize services
 claude_service = ClaudeService()
 
+# TTL cache for GitHub data — avoids duplicate API calls between /cost and /stream
+_github_cache: dict[str, tuple[float, dict]] = {}
+_CACHE_TTL = 300  # 5 minutes
 
-# cache github data to avoid double API calls from cost and generate
-@lru_cache(maxsize=100)
-def get_cached_github_data(username: str, repo: str, github_pat: str | None = None):
-    # Create a new service instance for each call with the appropriate PAT
-    current_github_service = GitHubService(pat=github_pat)
 
-    default_branch = current_github_service.get_default_branch(username, repo)
-    if not default_branch:
-        default_branch = "main"  # fallback value
+async def get_cached_github_data(username: str, repo: str, github_pat: str | None = None):
+    cache_key = f"{username}/{repo}"
+    now = time.monotonic()
 
-    file_tree = current_github_service.get_github_file_paths_as_list(username, repo)
-    readme = current_github_service.get_github_readme(username, repo)
+    if cache_key in _github_cache:
+        cached_time, cached_data = _github_cache[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            return cached_data
 
-    return {"default_branch": default_branch, "file_tree": file_tree, "readme": readme}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        service = GitHubService(pat=github_pat, client=client)
+        default_branch = await service.get_default_branch(username, repo)
+        if not default_branch:
+            default_branch = "main"
+        file_tree = await service.get_github_file_paths_as_list(username, repo)
+        readme = await service.get_github_readme(username, repo)
+
+    result = {"default_branch": default_branch, "file_tree": file_tree, "readme": readme}
+    _github_cache[cache_key] = (now, result)
+
+    # Evict expired entries
+    expired = [k for k, (t, _) in _github_cache.items() if now - t > _CACHE_TTL]
+    for k in expired:
+        del _github_cache[k]
+
+    return result
 
 
 class ApiRequest(BaseModel):
@@ -52,7 +69,7 @@ class ApiRequest(BaseModel):
 async def get_generation_cost(request: Request, body: ApiRequest):
     try:
         # Get file tree and README content
-        github_data = get_cached_github_data(body.username, body.repo, body.github_pat)
+        github_data = await get_cached_github_data(body.username, body.repo, body.github_pat)
         file_tree = github_data["file_tree"]
         readme = github_data["readme"]
 
@@ -73,10 +90,17 @@ async def get_generation_cost(request: Request, body: ApiRequest):
         return {"error": str(e)}
 
 
+_MAX_MERMAID_SIZE = 500_000  # 500KB max for sanitization
+
+
 def sanitize_mermaid_code(code: str) -> str:
     """
     Sanitize LLM-generated Mermaid code by fixing common syntax issues.
     """
+    if len(code) > _MAX_MERMAID_SIZE:
+        logger.warning("Mermaid code exceeds size limit (%d bytes), skipping sanitization", len(code))
+        return code
+
     # 1. Strip any %%{init:...}%% blocks (handled externally by frontend)
     code = re.sub(r"%%\{init:[\s\S]*?\}%%", "", code)
 
@@ -173,7 +197,7 @@ async def generate_stream(request: Request, body: ApiRequest):
         async def event_generator():
             try:
                 # Get cached github data
-                github_data = get_cached_github_data(
+                github_data = await get_cached_github_data(
                     body.username, body.repo, body.github_pat
                 )
                 default_branch = github_data["default_branch"]
@@ -290,6 +314,7 @@ async def generate_stream(request: Request, body: ApiRequest):
                 })}\n\n"
 
             except Exception as e:
+                logger.exception("Error in generate stream")
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         return StreamingResponse(

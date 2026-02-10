@@ -5,6 +5,7 @@ import { Card } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import type { IngestFormData } from "~/hooks/useIngest";
+import { safeGetItem } from "~/lib/safe-storage";
 
 const PRESETS: Record<
   string,
@@ -106,7 +107,7 @@ export function IngestForm({ onSubmit, loading }: IngestFormProps) {
 
       const pat =
         typeof window !== "undefined"
-          ? localStorage.getItem("github_pat") ?? undefined
+          ? safeGetItem("github_pat") ?? undefined
           : undefined;
 
       onSubmit({

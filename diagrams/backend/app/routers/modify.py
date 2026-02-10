@@ -1,11 +1,8 @@
 from fastapi import APIRouter, Request, HTTPException
-from dotenv import load_dotenv
 from app.services.claude_service import ClaudeService
 from anthropic._exceptions import RateLimitError
 from app.prompts import SYSTEM_MODIFY_PROMPT
 from pydantic import BaseModel
-
-load_dotenv()
 
 router = APIRouter(prefix="/modify", tags=["Claude"])
 

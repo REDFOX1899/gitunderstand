@@ -1,15 +1,12 @@
-import requests
+import httpx
 import jwt
 import time
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 
 class GitHubService:
-    def __init__(self, pat: str | None = None):
+    def __init__(self, pat: str | None = None, client: httpx.AsyncClient | None = None):
         # Try app authentication first
         self.client_id = os.getenv("GITHUB_CLIENT_ID")
         self.private_key = os.getenv("GITHUB_PRIVATE_KEY")
@@ -29,6 +26,12 @@ class GitHubService:
 
         self.access_token = None
         self.token_expires_at = None
+        self._client = client
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is not None:
+            return self._client
+        raise RuntimeError("GitHubService requires an httpx.AsyncClient")
 
     # autopep8: off
     def _generate_jwt(self):
@@ -43,12 +46,13 @@ class GitHubService:
 
     # autopep8: on
 
-    def _get_installation_token(self):
+    async def _get_installation_token(self):
         if self.access_token and self.token_expires_at > datetime.now():  # type: ignore
             return self.access_token
 
+        client = await self._get_client()
         jwt_token = self._generate_jwt()
-        response = requests.post(
+        response = await client.post(
             f"https://api.github.com/app/installations/{
                 self.installation_id}/access_tokens",
             headers={
@@ -61,7 +65,7 @@ class GitHubService:
         self.token_expires_at = datetime.now() + timedelta(hours=1)
         return self.access_token
 
-    def _get_headers(self):
+    async def _get_headers(self):
         # If no credentials are available, return basic headers
         if (
             not all([self.client_id, self.private_key, self.installation_id])
@@ -77,19 +81,21 @@ class GitHubService:
             }
 
         # Otherwise use app authentication
-        token = self._get_installation_token()
+        token = await self._get_installation_token()
         return {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-    def _check_repository_exists(self, username, repo):
+    async def _check_repository_exists(self, username, repo):
         """
         Check if the repository exists using the GitHub API.
         """
+        client = await self._get_client()
+        headers = await self._get_headers()
         api_url = f"https://api.github.com/repos/{username}/{repo}"
-        response = requests.get(api_url, headers=self._get_headers())
+        response = await client.get(api_url, headers=headers)
 
         if response.status_code == 404:
             raise ValueError("Repository not found.")
@@ -98,16 +104,18 @@ class GitHubService:
                 f"Failed to check repository: {response.status_code}, {response.json()}"
             )
 
-    def get_default_branch(self, username, repo):
+    async def get_default_branch(self, username, repo):
         """Get the default branch of the repository."""
+        client = await self._get_client()
+        headers = await self._get_headers()
         api_url = f"https://api.github.com/repos/{username}/{repo}"
-        response = requests.get(api_url, headers=self._get_headers())
+        response = await client.get(api_url, headers=headers)
 
         if response.status_code == 200:
             return response.json().get("default_branch")
         return None
 
-    def get_github_file_paths_as_list(self, username, repo):
+    async def get_github_file_paths_as_list(self, username, repo):
         """
         Fetches the file tree of an open-source GitHub repository,
         excluding static files and generated code.
@@ -160,12 +168,15 @@ class GitHubService:
 
             return not any(pattern in path.lower() for pattern in excluded_patterns)
 
+        client = await self._get_client()
+        headers = await self._get_headers()
+
         # Try to get the default branch first
-        branch = self.get_default_branch(username, repo)
+        branch = await self.get_default_branch(username, repo)
         if branch:
             api_url = f"https://api.github.com/repos/{
                 username}/{repo}/git/trees/{branch}?recursive=1"
-            response = requests.get(api_url, headers=self._get_headers())
+            response = await client.get(api_url, headers=headers)
 
             if response.status_code == 200:
                 data = response.json()
@@ -182,7 +193,7 @@ class GitHubService:
         for branch in ["main", "master"]:
             api_url = f"https://api.github.com/repos/{
                 username}/{repo}/git/trees/{branch}?recursive=1"
-            response = requests.get(api_url, headers=self._get_headers())
+            response = await client.get(api_url, headers=headers)
 
             if response.status_code == 200:
                 data = response.json()
@@ -199,7 +210,7 @@ class GitHubService:
             "Could not fetch repository file tree. Repository might not exist, be empty or private."
         )
 
-    def get_github_readme(self, username, repo):
+    async def get_github_readme(self, username, repo):
         """
         Fetches the README contents of an open-source GitHub repository.
 
@@ -215,11 +226,14 @@ class GitHubService:
             Exception: For other unexpected API errors.
         """
         # First check if the repository exists
-        self._check_repository_exists(username, repo)
+        await self._check_repository_exists(username, repo)
+
+        client = await self._get_client()
+        headers = await self._get_headers()
 
         # Then attempt to fetch the README
         api_url = f"https://api.github.com/repos/{username}/{repo}/readme"
-        response = requests.get(api_url, headers=self._get_headers())
+        response = await client.get(api_url, headers=headers)
 
         if response.status_code == 404:
             raise ValueError("No README found for the specified repository.")
@@ -230,5 +244,6 @@ class GitHubService:
             )
 
         data = response.json()
-        readme_content = requests.get(data["download_url"]).text
+        readme_response = await client.get(data["download_url"])
+        readme_content = readme_response.text
         return readme_content

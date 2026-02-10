@@ -6,6 +6,7 @@ import { FaGithub } from "react-icons/fa";
 import { getStarCount } from "~/app/_actions/github";
 import { PrivateReposDialog } from "./private-repos-dialog";
 import { ApiKeyDialog } from "./api-key-dialog";
+import { safeSetItem } from "~/lib/safe-storage";
 
 export function Header() {
   const [isPrivateReposDialogOpen, setIsPrivateReposDialogOpen] =
@@ -26,12 +27,12 @@ export function Header() {
   };
 
   const handlePrivateReposSubmit = (pat: string) => {
-    localStorage.setItem("github_pat", pat);
+    safeSetItem("github_pat", pat);
     setIsPrivateReposDialogOpen(false);
   };
 
   const handleApiKeySubmit = (apiKey: string) => {
-    localStorage.setItem("anthropic_key", apiKey);
+    safeSetItem("anthropic_key", apiKey);
     setIsApiKeyDialogOpen(false);
   };
 
