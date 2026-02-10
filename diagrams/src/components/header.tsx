@@ -70,7 +70,7 @@ export function Header() {
             <span className="hidden sm:inline">Private Repos</span>
           </span>
           <Link
-            href="https://github.com/ahmedkhaleel2004/gitdiagram"
+            href="https://github.com/REDFOX1899/gitunderstand"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-sm font-medium text-black transition-transform hover:translate-y-[-2px] hover:text-purple-600 sm:gap-2"

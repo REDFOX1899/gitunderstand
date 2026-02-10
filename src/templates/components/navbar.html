@@ -11,6 +11,21 @@
             </div>
             {# Navigation #}
             <nav class="flex items-center space-x-6">
+                {# Diagrams link #}
+                <button onclick="goToDiagram()"
+                        class="link-bounce flex items-center gap-1.5 text-stone-600 hover:text-foreground transition-colors text-sm font-medium"
+                        title="Visualize this repo as a diagram">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                        <line x1="10" y1="6.5" x2="14" y2="6.5"></line>
+                        <line x1="17.5" y1="10" x2="17.5" y2="14"></line>
+                        <line x1="6.5" y1="10" x2="6.5" y2="14"></line>
+                    </svg>
+                    Diagrams
+                </button>
                 {# GitHub link #}
                 <div class="flex items-center gap-2">
                     <a href="https://github.com/REDFOX1899/gitunderstand"
@@ -51,4 +66,17 @@ async function fetchGitHubStars() {
     }
 }
 fetchGitHubStars();
+
+// Navigate to diagrams page with current repo URL pre-filled
+function goToDiagram() {
+    const input = document.getElementById('input_text');
+    const url = input ? input.value.trim() : '';
+    // Try to extract username/repo from GitHub URL
+    const match = url.match(/github\.com\/([^\/]+)\/([^\/\?\#]+)/);
+    if (match) {
+        window.location.href = '/diagrams/' + match[1] + '/' + match[2].replace(/\.git$/, '');
+    } else {
+        window.location.href = '/diagrams';
+    }
+}
 </script>
