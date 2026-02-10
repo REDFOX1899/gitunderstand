@@ -1,0 +1,89 @@
+name: Deploy Diagrams Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "diagrams/**"
+      - ".github/workflows/deploy-diagrams.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: gitunderstand
+  REGION: us-central1
+  SERVICE: githubunderstand-web
+  IMAGE: us-central1-docker.pkg.dev/gitunderstand/gitunderstand/githubunderstand-web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: gitunderstand
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ]; then
+            echo "::error::GCP_WORKLOAD_IDENTITY_PROVIDER secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT secret is not set"
+            exit 1
+          fi
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        working-directory: diagrams
+        run: |
+          docker build \
+            --tag "${{ env.IMAGE }}:${{ github.sha }}" \
+            --tag "${{ env.IMAGE }}:latest" \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push "${{ env.IMAGE }}:${{ github.sha }}"
+          docker push "${{ env.IMAGE }}:latest"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image "${{ env.IMAGE }}:${{ github.sha }}" \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --timeout 300 \
+            --add-cloudsql-instances=gitunderstand:us-central1:gitdiagram-db \
+            --set-secrets "POSTGRES_URL=diagrams-db-url:latest" \
+            --set-env-vars "^@^GITUNDERSTAND_API_URL=https://gitunderstand-308289525742.us-central1.run.app@NEXT_PUBLIC_API_DEV_URL=https://gitdiagram-backend-308289525742.us-central1.run.app@NODE_ENV=production@SKIP_ENV_VALIDATION=1" \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Show Cloud Run URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format "value(status.url)")
+          echo "Cloud Run URL: $URL"
+          echo "::notice::Deployed to $URL"

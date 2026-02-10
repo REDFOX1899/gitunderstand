@@ -21,6 +21,10 @@ COPY . .
 ENV SKIP_ENV_VALIDATION=1
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Build-time arg for rewrite destination (baked into Next.js config at build)
+ARG GITUNDERSTAND_API_URL=https://gitunderstand-308289525742.us-central1.run.app
+ENV GITUNDERSTAND_API_URL=${GITUNDERSTAND_API_URL}
+
 RUN pnpm build
 
 # --- Production stage ---
