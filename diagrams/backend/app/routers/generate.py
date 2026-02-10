@@ -113,13 +113,14 @@ def sanitize_mermaid_code(code: str) -> str:
 
     code = re.sub(r'(\b\w+)\(([^)"]+)\)', quote_paren_label, code)
 
-    # 4. Remove :::className from subgraph declarations
+    # 4. Fix subgraph alias: subgraph ID "Name" → subgraph "Name"
+    #    (must run before class removal so alias+class combos are handled)
+    code = re.sub(r'subgraph\s+\w+\s+"([^"]+)"', r'subgraph "\1"', code)
+
+    # 5. Remove :::className from subgraph declarations
     #    subgraph "Name":::style → subgraph "Name"
     code = re.sub(r'(subgraph\s+"[^"]*"):::\w+', r"\1", code)
     code = re.sub(r"(subgraph\s+\S+):::\w+", r"\1", code)
-
-    # 5. Fix subgraph alias: subgraph ID "Name" → subgraph "Name"
-    code = re.sub(r'subgraph\s+\w+\s+"([^"]+)"', r'subgraph "\1"', code)
 
     # 6. Remove leading/trailing empty lines
     code = code.strip()

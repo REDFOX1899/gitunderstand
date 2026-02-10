@@ -198,9 +198,31 @@ jobs:
           URL=$(gcloud run services describe githubunderstand-web --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format "value(status.url)")
           echo "::notice::Diagrams frontend deployed to $URL"
 
+  # Test the diagrams backend (runs on diagrams-backend changes or PRs)
+  test-diagrams-backend:
+    needs: changes
+    if: needs.changes.outputs.diagrams-backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r diagrams/backend/requirements.txt pytest
+
+      - name: Run unit tests
+        run: pytest diagrams/backend/tests/ -v -m "not integration"
+
   # Deploy the diagrams backend (FastAPI) to Cloud Run
   deploy-diagrams-backend:
-    needs: [changes]
+    needs: [changes, test-diagrams-backend]
     if: github.event_name == 'push' && needs.changes.outputs.diagrams-backend == 'true'
     runs-on: ubuntu-latest
     environment: gitunderstand
@@ -242,8 +264,9 @@ jobs:
             --min-instances 0 \
             --max-instances 5 \
             --timeout 300 \
+            --add-cloudsql-instances=gitunderstand:us-central1:gitdiagram-db \
             --set-secrets "ANTHROPIC_API_KEY=claude-api-key:latest" \
-            --set-env-vars "ENVIRONMENT=production" \
+            --set-env-vars "^@^ENVIRONMENT=production@ALLOWED_ORIGINS=https://githubunderstand.com,https://www.githubunderstand.com,http://localhost:3000" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Show URL
