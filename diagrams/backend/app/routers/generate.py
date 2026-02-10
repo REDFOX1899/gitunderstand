@@ -38,7 +38,7 @@ async def get_cached_github_data(username: str, repo: str, github_pat: str | Non
         if now - cached_time < _CACHE_TTL:
             return cached_data
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         service = GitHubService(pat=github_pat, client=client)
         default_branch = await service.get_default_branch(username, repo)
         if not default_branch:
