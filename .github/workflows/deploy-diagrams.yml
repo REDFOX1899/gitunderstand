@@ -75,8 +75,8 @@ jobs:
             --max-instances 5 \
             --timeout 300 \
             --add-cloudsql-instances=gitunderstand:us-central1:gitdiagram-db \
-            --set-secrets "POSTGRES_URL=diagrams-db-url:latest" \
-            --set-env-vars "^@^GITUNDERSTAND_API_URL=https://gitunderstand-308289525742.us-central1.run.app@NEXT_PUBLIC_API_DEV_URL=https://gitdiagram-backend-308289525742.us-central1.run.app@NODE_ENV=production@SKIP_ENV_VALIDATION=1" \
+            --set-secrets "POSTGRES_URL=diagrams-db-url:latest,AUTH_SECRET=auth-secret:latest,AUTH_GITHUB_ID=auth-github-id:latest,AUTH_GITHUB_SECRET=auth-github-secret:latest,AUTH_GOOGLE_ID=auth-google-id:latest,AUTH_GOOGLE_SECRET=auth-google-secret:latest,ENCRYPTION_KEY=encryption-key:latest" \
+            --set-env-vars "^@^GITUNDERSTAND_API_URL=https://gitunderstand-308289525742.us-central1.run.app@NEXT_PUBLIC_API_DEV_URL=https://gitdiagram-backend-308289525742.us-central1.run.app@NODE_ENV=production@SKIP_ENV_VALIDATION=1@AUTH_TRUST_HOST=true@AUTH_URL=https://gitunderstand.com" \
             --project ${{ env.PROJECT_ID }}
 
       - name: Show Cloud Run URL
