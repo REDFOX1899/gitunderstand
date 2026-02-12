@@ -25,8 +25,12 @@ const config = {
           destination: "https://us.i.posthog.com/decide",
         },
       ],
-      // Proxy /api/* to GitUnderstand backend
+      // Proxy /api/* to GitUnderstand backend (excluding /api/auth/* which is handled by NextAuth)
       afterFiles: [
+        {
+          source: "/api/auth/:path*",
+          destination: "/api/auth/:path*",
+        },
         {
           source: "/api/:path*",
           destination: `${process.env.GITUNDERSTAND_API_URL ?? "http://localhost:8080"}/api/:path*`,

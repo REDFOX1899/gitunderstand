@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import {
   cacheDiagramAndExplanation,
   getCachedDiagram,
 } from "~/app/_actions/cache";
 import { getLastGeneratedDate } from "~/app/_actions/repo";
+import {
+  getAnthropicKey,
+  getGithubPat,
+} from "~/app/_actions/user";
 import { getCostOfGeneration } from "~/lib/fetch-backend";
 import { exampleRepos } from "~/lib/exampleRepos";
 import { safeGetItem, safeSetItem } from "~/lib/safe-storage";
@@ -57,6 +62,31 @@ export function useDiagram(username: string, repo: string) {
     },
   );
 
+  // Auth-aware key loading: prefer DB-stored keys for logged-in users
+  const { data: session } = useSession();
+  const [dbAnthropicKey, setDbAnthropicKey] = useState<string | null>(null);
+  const [dbGithubPat, setDbGithubPat] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session?.user) {
+      void getAnthropicKey().then(setDbAnthropicKey);
+      void getGithubPat().then(setDbGithubPat);
+    } else {
+      setDbAnthropicKey(null);
+      setDbGithubPat(null);
+    }
+  }, [session]);
+
+  const getEffectiveAnthropicKey = useCallback((): string | null => {
+    if (session?.user && dbAnthropicKey) return dbAnthropicKey;
+    return safeGetItem("anthropic_key");
+  }, [session, dbAnthropicKey]);
+
+  const getEffectiveGithubPat = useCallback((): string | null => {
+    if (session?.user && dbGithubPat) return dbGithubPat;
+    return safeGetItem("github_pat");
+  }, [session, dbGithubPat]);
+
   const generateDiagram = useCallback(
     async (instructions = "", githubPat?: string) => {
       setState({
@@ -76,7 +106,7 @@ export function useDiagram(username: string, repo: string) {
             username,
             repo,
             instructions,
-            api_key: safeGetItem("anthropic_key") ?? undefined,
+            api_key: getEffectiveAnthropicKey() ?? undefined,
             github_pat: githubPat,
           }),
         });
@@ -271,13 +301,13 @@ export function useDiagram(username: string, repo: string) {
         setLoading(false);
       }
     },
-    [username, repo, hasUsedFreeGeneration],
+    [username, repo, hasUsedFreeGeneration, getEffectiveAnthropicKey],
   );
 
   useEffect(() => {
     if (state.status === "complete" && state.diagram) {
       // Cache the completed diagram with the usedOwnKey flag
-      const hasApiKey = !!safeGetItem("anthropic_key");
+      const hasApiKey = !!getEffectiveAnthropicKey();
       void cacheDiagramAndExplanation(
         username,
         repo,
@@ -292,7 +322,7 @@ export function useDiagram(username: string, repo: string) {
     } else if (state.status === "error") {
       setLoading(false);
     }
-  }, [state.status, state.diagram, username, repo, state.explanation]);
+  }, [state.status, state.diagram, username, repo, state.explanation, getEffectiveAnthropicKey]);
 
   const getDiagram = useCallback(async () => {
     setCheckingCache(true);
@@ -302,7 +332,7 @@ export function useDiagram(username: string, repo: string) {
     try {
       // Check cache first - always allow access to cached diagrams
       const cached = await getCachedDiagram(username, repo);
-      const github_pat = safeGetItem("github_pat");
+      const github_pat = getEffectiveGithubPat();
 
       if (cached) {
         setDiagram(cached);
@@ -359,7 +389,7 @@ export function useDiagram(username: string, repo: string) {
       setCheckingCache(false);
       setLoading(false);
     }
-  }, [username, repo, generateDiagram]);
+  }, [username, repo, generateDiagram, getEffectiveGithubPat]);
 
   useEffect(() => {
     void getDiagram();
@@ -401,7 +431,7 @@ export function useDiagram(username: string, repo: string) {
     setError("");
     setCost("");
     try {
-      const github_pat = safeGetItem("github_pat");
+      const github_pat = getEffectiveGithubPat();
 
       // TEMP: LET USERS HAVE INFINITE GENERATIONS
       // const storedApiKey = localStorage.getItem("anthropic_key");
@@ -498,7 +528,7 @@ export function useDiagram(username: string, repo: string) {
     safeSetItem("anthropic_key", apiKey);
 
     // Then generate diagram using stored key
-    const github_pat = safeGetItem("github_pat");
+    const github_pat = getEffectiveGithubPat();
     try {
       await generateDiagram("", github_pat ?? undefined);
     } catch (error) {

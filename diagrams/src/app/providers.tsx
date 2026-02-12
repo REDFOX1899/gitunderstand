@@ -2,6 +2,7 @@
 "use client";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
+import { SessionProvider } from "next-auth/react";
 
 if (typeof window !== "undefined") {
   // Only initialize PostHog if the environment variables are available
@@ -22,5 +23,9 @@ if (typeof window !== "undefined") {
 }
 
 export function CSPostHogProvider({ children }: { children: React.ReactNode }) {
-  return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+  return (
+    <SessionProvider>
+      <PostHogProvider client={posthog}>{children}</PostHogProvider>
+    </SessionProvider>
+  );
 }

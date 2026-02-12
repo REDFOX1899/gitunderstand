@@ -7,6 +7,7 @@ import { getStarCount } from "~/app/_actions/github";
 import { PrivateReposDialog } from "./private-repos-dialog";
 import { ApiKeyDialog } from "./api-key-dialog";
 import { safeSetItem } from "~/lib/safe-storage";
+import { SignInButton } from "./sign-in-button";
 
 export function Header() {
   const [isPrivateReposDialogOpen, setIsPrivateReposDialogOpen] =
@@ -81,6 +82,7 @@ export function Header() {
             <span className="text-amber-400">★</span>
             {formatStarCount(starCount)}
           </span>
+          <SignInButton />
         </nav>
 
         <PrivateReposDialog
