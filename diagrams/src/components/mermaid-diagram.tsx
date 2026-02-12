@@ -94,6 +94,7 @@ const MermaidChart = ({ chart, zoomingEnabled = true, onNodeClick }: MermaidChar
       theme: "neutral",
       securityLevel: "loose",
       htmlLabels: true,
+      maxTextSize: 200000,
       flowchart: {
         htmlLabels: true,
         curve: "basis",

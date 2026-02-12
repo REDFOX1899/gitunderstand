@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
   cacheDiagramAndExplanation,
@@ -62,30 +62,32 @@ export function useDiagram(username: string, repo: string) {
     },
   );
 
-  // Auth-aware key loading: prefer DB-stored keys for logged-in users
+  // Auth-aware key loading: prefer DB-stored keys for logged-in users.
+  // Use refs instead of state to avoid callback recreation cascades that
+  // would cause getDiagram to re-fire via the useEffect dependency chain.
   const { data: session } = useSession();
-  const [dbAnthropicKey, setDbAnthropicKey] = useState<string | null>(null);
-  const [dbGithubPat, setDbGithubPat] = useState<string | null>(null);
+  const dbAnthropicKeyRef = useRef<string | null>(null);
+  const dbGithubPatRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (session?.user) {
-      void getAnthropicKey().then(setDbAnthropicKey);
-      void getGithubPat().then(setDbGithubPat);
+      void getAnthropicKey().then((key) => { dbAnthropicKeyRef.current = key; });
+      void getGithubPat().then((pat) => { dbGithubPatRef.current = pat; });
     } else {
-      setDbAnthropicKey(null);
-      setDbGithubPat(null);
+      dbAnthropicKeyRef.current = null;
+      dbGithubPatRef.current = null;
     }
   }, [session]);
 
   const getEffectiveAnthropicKey = useCallback((): string | null => {
-    if (session?.user && dbAnthropicKey) return dbAnthropicKey;
+    if (session?.user && dbAnthropicKeyRef.current) return dbAnthropicKeyRef.current;
     return safeGetItem("anthropic_key");
-  }, [session, dbAnthropicKey]);
+  }, [session]);
 
   const getEffectiveGithubPat = useCallback((): string | null => {
-    if (session?.user && dbGithubPat) return dbGithubPat;
+    if (session?.user && dbGithubPatRef.current) return dbGithubPatRef.current;
     return safeGetItem("github_pat");
-  }, [session, dbGithubPat]);
+  }, [session]);
 
   const generateDiagram = useCallback(
     async (instructions = "", githubPat?: string) => {
@@ -201,15 +203,21 @@ export function useDiagram(username: string, repo: string) {
                 setState((prev) => ({ ...prev, diagram }));
               }
               break;
-            case "complete":
+            case "complete": {
+              // Defensive fence stripping — backend should already strip fences,
+              // but React state batching can cause dirty chunk-accumulated data
+              // to overwrite the clean complete event data.
+              const cleanDiagram = data.diagram
+                ? data.diagram.replace(/```mermaid/g, "").replace(/```/g, "").trim()
+                : undefined;
               setState({
                 status: "complete",
                 explanation: data.explanation,
-                diagram: data.diagram,
+                diagram: cleanDiagram,
               });
               // Set diagram immediately to avoid race with loading=false
-              if (data.diagram) {
-                setDiagram(data.diagram);
+              if (cleanDiagram) {
+                setDiagram(cleanDiagram);
                 diagramSet = true;
               }
               const date = await getLastGeneratedDate(username, repo);
@@ -222,6 +230,7 @@ export function useDiagram(username: string, repo: string) {
                 setHasUsedFreeGeneration(true);
               }
               break;
+            }
             case "error":
               setState({ status: "error", error: data.error });
               break;
@@ -306,16 +315,19 @@ export function useDiagram(username: string, repo: string) {
 
   useEffect(() => {
     if (state.status === "complete" && state.diagram) {
+      // Safety net: strip any remaining code fences before caching/rendering
+      const cleanDiagram = state.diagram
+        .replace(/```mermaid/g, "").replace(/```/g, "").trim();
       // Cache the completed diagram with the usedOwnKey flag
       const hasApiKey = !!getEffectiveAnthropicKey();
       void cacheDiagramAndExplanation(
         username,
         repo,
-        state.diagram,
+        cleanDiagram,
         state.explanation ?? "No explanation provided",
         hasApiKey,
       );
-      setDiagram(state.diagram);
+      setDiagram(cleanDiagram);
       void getLastGeneratedDate(username, repo).then((date) =>
         setLastGenerated(date ?? undefined),
       );
