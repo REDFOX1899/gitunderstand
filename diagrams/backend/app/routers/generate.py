@@ -29,7 +29,12 @@ _github_cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 300  # 5 minutes
 
 
-async def get_cached_github_data(username: str, repo: str, github_pat: str | None = None):
+async def get_cached_github_data(
+    username: str,
+    repo: str,
+    github_pat: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+):
     cache_key = f"{username}/{repo}"
     now = time.monotonic()
 
@@ -38,13 +43,22 @@ async def get_cached_github_data(username: str, repo: str, github_pat: str | Non
         if now - cached_time < _CACHE_TTL:
             return cached_data
 
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        service = GitHubService(pat=github_pat, client=client)
+    # Use the shared client from app.state, or create a temporary one as fallback
+    if http_client:
+        service = GitHubService(pat=github_pat, client=http_client)
         default_branch = await service.get_default_branch(username, repo)
         if not default_branch:
             default_branch = "main"
         file_tree = await service.get_github_file_paths_as_list(username, repo)
         readme = await service.get_github_readme(username, repo)
+    else:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            service = GitHubService(pat=github_pat, client=client)
+            default_branch = await service.get_default_branch(username, repo)
+            if not default_branch:
+                default_branch = "main"
+            file_tree = await service.get_github_file_paths_as_list(username, repo)
+            readme = await service.get_github_readme(username, repo)
 
     result = {"default_branch": default_branch, "file_tree": file_tree, "readme": readme}
     _github_cache[cache_key] = (now, result)
@@ -69,7 +83,8 @@ class ApiRequest(BaseModel):
 async def get_generation_cost(request: Request, body: ApiRequest):
     try:
         # Get file tree and README content
-        github_data = await get_cached_github_data(body.username, body.repo, body.github_pat)
+        http_client = getattr(request.app.state, "http_client", None)
+        github_data = await get_cached_github_data(body.username, body.repo, body.github_pat, http_client)
         file_tree = github_data["file_tree"]
         readme = github_data["readme"]
 
@@ -194,11 +209,13 @@ async def generate_stream(request: Request, body: ApiRequest):
         ]:
             return {"error": "Example repos cannot be regenerated"}
 
+        http_client = getattr(request.app.state, "http_client", None)
+
         async def event_generator():
             try:
                 # Get cached github data
                 github_data = await get_cached_github_data(
-                    body.username, body.repo, body.github_pat
+                    body.username, body.repo, body.github_pat, http_client
                 )
                 default_branch = github_data["default_branch"]
                 file_tree = github_data["file_tree"]

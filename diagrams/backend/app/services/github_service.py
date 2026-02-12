@@ -102,8 +102,9 @@ class GitHubService:
         if response.status_code == 404:
             raise ValueError("Repository not found.")
         elif response.status_code != 200:
-            raise Exception(
-                f"Failed to check repository: {response.status_code}, {response.json()}"
+            logger.error("GitHub API error checking repo: %d", response.status_code)
+            raise RuntimeError(
+                f"GitHub API error ({response.status_code}) while checking repository"
             )
 
     async def get_default_branch(self, username, repo):
@@ -238,8 +239,9 @@ class GitHubService:
         if response.status_code == 404:
             raise ValueError("No README found for the specified repository.")
         elif response.status_code != 200:
-            raise Exception(
-                f"Failed to fetch README: {response.status_code}, {response.json()}"
+            logger.error("GitHub API error fetching README: %d", response.status_code)
+            raise RuntimeError(
+                f"GitHub API error ({response.status_code}) while fetching README"
             )
 
         data = response.json()

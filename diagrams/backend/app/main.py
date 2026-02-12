@@ -8,6 +8,7 @@ from app.core.limiter import limiter
 from typing import cast
 from starlette.exceptions import ExceptionMiddleware
 from api_analytics.fastapi import Analytics
+import httpx
 import os
 
 load_dotenv()
@@ -15,7 +16,11 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Shared httpx client for GitHub API calls (connection pooling)
+    app.state.http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
     yield
+    # Cleanup shared httpx client
+    await app.state.http_client.aclose()
     # Cleanup shared aiohttp sessions
     from app.routers.generate import claude_service as gen_claude
     from app.routers.modify import claude_service as mod_claude

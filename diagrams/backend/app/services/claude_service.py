@@ -1,10 +1,13 @@
 from anthropic import Anthropic
 from app.utils.format_message import format_user_message
 from typing import AsyncGenerator
+import logging
 import tiktoken
 import aiohttp
 import json
 import os
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeService:
@@ -75,7 +78,7 @@ class ClaudeService:
         ) as response:
             if response.status != 200:
                 error_text = await response.text()
-                print(f"Anthropic API error: {error_text}")
+                logger.error("Anthropic API error (status %d): %s", response.status, error_text)
                 raise ValueError(
                     f"Anthropic API returned status {response.status}: {error_text}"
                 )
