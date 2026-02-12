@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe("safeGetItem", () => {
   it("returns stored value", () => {
-    mockStorage["testKey"] = "testValue";
+    mockStorage.testKey = "testValue";
     expect(safeGetItem("testKey")).toBe("testValue");
   });
 
@@ -43,7 +43,7 @@ describe("safeGetItem", () => {
 describe("safeSetItem", () => {
   it("stores a value", () => {
     safeSetItem("key", "value");
-    expect(mockStorage["key"]).toBe("value");
+    expect(mockStorage.key).toBe("value");
   });
 
   it("does not throw when localStorage throws", () => {
@@ -58,9 +58,9 @@ describe("safeSetItem", () => {
 
 describe("safeRemoveItem", () => {
   it("removes a stored value", () => {
-    mockStorage["key"] = "value";
+    mockStorage.key = "value";
     safeRemoveItem("key");
-    expect(mockStorage["key"]).toBeUndefined();
+    expect(mockStorage.key).toBeUndefined();
   });
 
   it("does not throw when localStorage throws", () => {

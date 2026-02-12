@@ -77,7 +77,7 @@ class TestGitHubServiceAPI:
 
     @pytest.mark.asyncio
     async def test_check_repository_exists_500(self):
-        """Should raise Exception for server errors."""
+        """Should raise RuntimeError for server errors."""
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.json.return_value = {"message": "Internal Server Error"}
@@ -86,7 +86,7 @@ class TestGitHubServiceAPI:
         mock_client.get = AsyncMock(return_value=mock_response)
 
         service = GitHubService(pat="ghp_test", client=mock_client)
-        with pytest.raises(Exception, match="Failed to check repository"):
+        with pytest.raises(RuntimeError, match="GitHub API error"):
             await service._check_repository_exists("user", "repo")
 
     @pytest.mark.asyncio
