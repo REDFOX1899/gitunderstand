@@ -1,17 +1,88 @@
+# Docker Compose for local development
+# Starts all 3 services + PostgreSQL
+#
+# Usage:
+#   cp .env.example .env          # then fill in your keys
+#   cp diagrams/.env.example diagrams/.env
+#   cp diagrams/backend/.env.example diagrams/backend/.env
+#   docker compose up
+
 services:
-  app:
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gitdiagram_user
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: gitdiagram
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitdiagram_user -d gitdiagram"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── GitUnderstand API (Python FastAPI — ingestion engine) ───
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${PORT:-8080}:8080"
+      - "8080:8080"
     environment:
       PORT: "8080"
       DEBUG: "true"
       USE_LOCAL_STORAGE: "true"
       LOCAL_STORAGE_PATH: "/tmp/gitunderstand"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
+      CLAUDE_API_KEY: "${CLAUDE_API_KEY:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
     volumes:
       - ./src:/app/src:ro
       - ./static:/app/static:ro
     user: "1000:1000"
+
+  # ── GitDiagram Backend (Python FastAPI — diagram generation) ─
+  diagrams-backend:
+    build:
+      context: ./diagrams/backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: "development"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GITHUB_PAT: "${GITHUB_PAT:-}"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Next.js Frontend (serves both GitUnderstand + Diagrams) ─
+  web:
+    build:
+      context: ./diagrams
+      dockerfile: Dockerfile
+      args:
+        GITUNDERSTAND_API_URL: "http://backend:8080"
+        NEXT_PUBLIC_API_DEV_URL: "http://localhost:8000"
+    ports:
+      - "3000:8080"
+    environment:
+      NODE_ENV: "development"
+      POSTGRES_URL: "postgresql://gitdiagram_user:localdev@postgres:5432/gitdiagram"
+      GITUNDERSTAND_API_URL: "http://backend:8080"
+      NEXT_PUBLIC_API_DEV_URL: "http://localhost:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      diagrams-backend:
+        condition: service_started
+
+volumes:
+  pgdata:
