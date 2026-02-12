@@ -90,7 +90,3 @@ Key env vars (see `.env.example` for full list):
 - `DEBUG` — Enable debug mode
 - `HOST` / `PORT` — Server binding (default `0.0.0.0:8080`)
 
-## Known TODOs in Codebase
-
-- `src/core/ingestion.py`: FIX TODO 1 — verify file exists before building node
-- `src/core/ingestion.py`: FIX TODO 2 — re-check limits after processing each child

@@ -1,8 +1,11 @@
 import httpx
 import jwt
+import logging
 import time
 from datetime import datetime, timedelta
 import os
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubService:
@@ -20,8 +23,8 @@ class GitHubService:
             not all([self.client_id, self.private_key, self.installation_id])
             and not self.github_token
         ):
-            print(
-                "\033[93mWarning: No GitHub credentials provided. Using unauthenticated requests with rate limit of 60 requests/hour.\033[0m"
+            logger.warning(
+                "No GitHub credentials provided. Using unauthenticated requests with rate limit of 60 requests/hour."
             )
 
         self.access_token = None

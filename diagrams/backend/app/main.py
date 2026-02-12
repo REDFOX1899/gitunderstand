@@ -53,6 +53,10 @@ app.include_router(modify.router)
 
 
 @app.get("/")
-# @limiter.limit("100/day")
 async def root(request: Request):
     return {"message": "Hello from GitDiagram API!"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}

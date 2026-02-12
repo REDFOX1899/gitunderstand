@@ -70,12 +70,6 @@ def ingest_query(
     if (query.type and query.type == "blob") or query.local_path.is_file():
         logger.info("Processing single file", extra={"file_path": str(path)})
 
-        # FIX TODO 1: Check that the file actually exists before building the node
-        if not path.exists():
-            logger.error("Blob path does not exist", extra={"path": str(path)})
-            msg = f"{query.slug} blob path cannot be found at {path}"
-            raise ValueError(msg)
-
         if not path.is_file():
             logger.error("Expected file but found non-file", extra={"path": str(path)})
             msg = f"Path {path} is not a file"
@@ -179,12 +173,13 @@ def _process_node(
         if sub_path.is_symlink():
             _process_symlink(path=sub_path, parent_node=node, stats=stats, local_path=query.local_path)
         elif sub_path.is_file():
-            if sub_path.stat().st_size > query.max_file_size:
+            file_size = sub_path.stat().st_size
+            if file_size > query.max_file_size:
                 logger.debug(
                     "Skipping file: would exceed max file size limit",
                     extra={
                         "file_path": str(sub_path),
-                        "file_size": sub_path.stat().st_size,
+                        "file_size": file_size,
                         "max_file_size": query.max_file_size,
                     },
                 )
@@ -224,8 +219,6 @@ def _process_node(
         else:
             logger.warning("Unknown file type, skipping", extra={"file_path": str(sub_path)})
 
-        # FIX TODO 2: After processing each child, re-check limits and break early
-        # if exceeded to end the directory iteration loop immediately.
         if limit_exceeded(stats, depth=node.depth):
             break
 
