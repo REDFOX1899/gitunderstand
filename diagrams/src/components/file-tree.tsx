@@ -70,9 +70,11 @@ interface TreeNodeItemProps {
   node: TreeNode;
   query: string;
   allExpanded: boolean | null;
+  onFileClick?: (filePath: string) => void;
+  selectedFile?: string | null;
 }
 
-function TreeNodeItem({ node, query, allExpanded }: TreeNodeItemProps) {
+function TreeNodeItem({ node, query, allExpanded, onFileClick, selectedFile }: TreeNodeItemProps) {
   const [expanded, setExpanded] = useState(true);
   const isDir = node.type === "directory";
 
@@ -110,7 +112,16 @@ function TreeNodeItem({ node, query, allExpanded }: TreeNodeItemProps) {
               className="mr-1 inline-block h-2 w-2 flex-shrink-0 rounded-full"
               style={{ backgroundColor: getFileExtColor(node.name) }}
             />
-            <span className="text-stone-700">{node.name}</span>
+            <span
+              className={`${
+                onFileClick
+                  ? "cursor-pointer hover:text-cyan-600 hover:underline"
+                  : ""
+              } ${selectedFile === node.path ? "font-semibold text-cyan-600" : "text-stone-700"}`}
+              onClick={onFileClick ? () => onFileClick(node.path) : undefined}
+            >
+              {node.name}
+            </span>
             {node.size != null && node.size > 0 && (
               <span className="ml-auto pl-2 text-xs tabular-nums text-stone-400">
                 {formatFileSize(node.size)}
@@ -127,6 +138,8 @@ function TreeNodeItem({ node, query, allExpanded }: TreeNodeItemProps) {
               node={child}
               query={query}
               allExpanded={allExpanded}
+              onFileClick={onFileClick}
+              selectedFile={selectedFile}
             />
           ))}
         </div>
@@ -138,9 +151,11 @@ function TreeNodeItem({ node, query, allExpanded }: TreeNodeItemProps) {
 interface FileTreeProps {
   treeData: TreeNode;
   plainTree?: string;
+  onFileClick?: (filePath: string) => void;
+  selectedFile?: string | null;
 }
 
-export function FileTree({ treeData, plainTree }: FileTreeProps) {
+export function FileTree({ treeData, plainTree, onFileClick, selectedFile }: FileTreeProps) {
   const [query, setQuery] = useState("");
   const [allExpanded, setAllExpanded] = useState<boolean | null>(null);
 
@@ -188,6 +203,8 @@ export function FileTree({ treeData, plainTree }: FileTreeProps) {
             node={treeData}
             query={query}
             allExpanded={allExpanded}
+            onFileClick={onFileClick}
+            selectedFile={selectedFile}
           />
         ) : plainTree ? (
           <pre className="whitespace-pre-wrap text-stone-700">{plainTree}</pre>

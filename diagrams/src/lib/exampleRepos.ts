@@ -1,9 +1,9 @@
 export const exampleRepos: Record<string, string> = {
-  FastAPI: "/diagrams/fastapi/fastapi",
-  Streamlit: "/diagrams/streamlit/streamlit",
-  Flask: "/diagrams/pallets/flask",
-  "api-analytics": "/diagrams/tom-draper/api-analytics",
-  Monkeytype: "/diagrams/monkeytypegame/monkeytype",
+  FastAPI: "/fastapi/fastapi",
+  Streamlit: "/streamlit/streamlit",
+  Flask: "/pallets/flask",
+  "api-analytics": "/tom-draper/api-analytics",
+  Monkeytype: "/monkeytypegame/monkeytype",
 };
 
 export const ingestExampleRepos = [

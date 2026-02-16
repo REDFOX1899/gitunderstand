@@ -3,6 +3,7 @@
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "next-themes";
 
 if (typeof window !== "undefined") {
   // Only initialize PostHog if the environment variables are available
@@ -24,8 +25,10 @@ if (typeof window !== "undefined") {
 
 export function CSPostHogProvider({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      <PostHogProvider client={posthog}>{children}</PostHogProvider>
-    </SessionProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <SessionProvider>
+        <PostHogProvider client={posthog}>{children}</PostHogProvider>
+      </SessionProvider>
+    </ThemeProvider>
   );
 }
