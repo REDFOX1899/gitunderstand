@@ -5,36 +5,63 @@ export interface ContentBlock {
   content: string;
 }
 
+/**
+ * Parse file content blocks from the ingest digest output.
+ *
+ * The format per file block is:
+ *   SEPARATOR
+ *   TYPE: path
+ *   SEPARATOR
+ *   <content>
+ *
+ * Where TYPE is FILE, DIRECTORY, or SYMLINK.
+ */
 export function parseContentBlocks(content: string): ContentBlock[] {
   if (!content) return [];
   const blocks: ContentBlock[] = [];
-  const parts = content.split(SEPARATOR);
+  const lines = content.split("\n");
 
-  for (const part of parts) {
-    if (!part.trim()) continue;
-    const lines = part.split("\n");
-    let filePath: string | null = null;
-    let contentStart = 0;
+  let i = 0;
+  while (i < lines.length) {
+    // Look for a separator line
+    if (lines[i]!.trim() === SEPARATOR) {
+      // Next line should be the file path (e.g., "FILE: src/main.py")
+      const pathLine = lines[i + 1]?.trim() ?? "";
+      let filePath: string | null = null;
 
-    for (let j = 0; j < lines.length; j++) {
-      const line = lines[j]!.trim();
       if (
-        line.startsWith("FILE:") ||
-        line.startsWith("DIRECTORY:") ||
-        line.startsWith("SYMLINK:")
+        pathLine.startsWith("FILE:") ||
+        pathLine.startsWith("DIRECTORY:") ||
+        pathLine.startsWith("SYMLINK:")
       ) {
-        filePath = line.split(":").slice(1).join(":").trim();
-        contentStart = j + 1;
-        break;
+        filePath = pathLine.split(":").slice(1).join(":").trim();
+      }
+
+      if (filePath) {
+        // Skip past: separator, path line, separator
+        i += 2;
+        // The next line should be another separator
+        if (i < lines.length && lines[i]!.trim() === SEPARATOR) {
+          i += 1;
+        }
+
+        // Collect content lines until the next separator (or end)
+        const contentLines: string[] = [];
+        while (i < lines.length && lines[i]!.trim() !== SEPARATOR) {
+          contentLines.push(lines[i]!);
+          i++;
+        }
+
+        const fileContent = contentLines.join("\n").trim();
+        if (fileContent) {
+          blocks.push({ path: filePath, content: fileContent });
+        }
+        // Don't increment i — the while loop will pick up the next separator
+        continue;
       }
     }
 
-    if (filePath) {
-      const fileContent = lines.slice(contentStart).join("\n").trim();
-      if (fileContent) {
-        blocks.push({ path: filePath, content: fileContent });
-      }
-    }
+    i++;
   }
 
   return blocks;

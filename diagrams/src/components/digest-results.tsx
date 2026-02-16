@@ -12,47 +12,7 @@ function formatTokenCount(count: number): string {
   return String(count);
 }
 
-const SEPARATOR = "================================================";
-
-interface ContentBlock {
-  path: string;
-  content: string;
-}
-
-function parseContentBlocks(content: string): ContentBlock[] {
-  if (!content) return [];
-  const blocks: ContentBlock[] = [];
-  const parts = content.split(SEPARATOR);
-
-  for (const part of parts) {
-    if (!part.trim()) continue;
-    const lines = part.split("\n");
-    let filePath: string | null = null;
-    let contentStart = 0;
-
-    for (let j = 0; j < lines.length; j++) {
-      const line = lines[j]!.trim();
-      if (
-        line.startsWith("FILE:") ||
-        line.startsWith("DIRECTORY:") ||
-        line.startsWith("SYMLINK:")
-      ) {
-        filePath = line.split(":").slice(1).join(":").trim();
-        contentStart = j + 1;
-        break;
-      }
-    }
-
-    if (filePath) {
-      const fileContent = lines.slice(contentStart).join("\n").trim();
-      if (fileContent) {
-        blocks.push({ path: filePath, content: fileContent });
-      }
-    }
-  }
-
-  return blocks;
-}
+import { parseContentBlocks } from "~/lib/content-parser";
 
 interface DigestResultsProps {
   result: IngestResult;
