@@ -2,6 +2,7 @@ from google import genai
 from app.utils.format_message import format_user_message
 from typing import AsyncGenerator
 import logging
+import os
 import tiktoken
 
 logger = logging.getLogger(__name__)
@@ -12,14 +13,21 @@ class GeminiService:
 
     def __init__(self):
         self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.server_api_key = os.environ.get("GEMINI_API_KEY")
+
+    def _get_api_key(self, api_key: str | None) -> str:
+        """Return user key if provided, else fall back to server key."""
+        key = api_key or self.server_api_key
+        if not key:
+            raise ValueError("A Gemini API key is required. Please provide your API key in settings.")
+        return key
 
     def call_gemini_api(
         self, system_prompt: str, data: dict, api_key: str | None = None
     ) -> str:
-        if not api_key:
-            raise ValueError("A Gemini API key is required. Please provide your API key in settings.")
+        effective_key = self._get_api_key(api_key)
         user_message = format_user_message(data)
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=effective_key)
 
         response = client.models.generate_content(
             model=self.MODEL,
@@ -38,10 +46,9 @@ class GeminiService:
         data: dict,
         api_key: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        if not api_key:
-            raise ValueError("A Gemini API key is required. Please provide your API key in settings.")
+        effective_key = self._get_api_key(api_key)
         user_message = format_user_message(data)
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=effective_key)
 
         response = client.models.generate_content_stream(
             model=self.MODEL,

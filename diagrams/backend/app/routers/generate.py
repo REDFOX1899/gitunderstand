@@ -228,7 +228,8 @@ async def generate_stream(request: Request, body: ApiRequest):
                 combined_content = f"{file_tree}\n{readme}"
                 token_count = gemini_service.count_tokens(combined_content)
 
-                if not body.api_key:
+                # Check if any API key is available (user-provided or server-side)
+                if not body.api_key and not gemini_service.server_api_key:
                     yield f"data: {json.dumps({'error': 'A Gemini API key is required. Please add your API key in settings to generate diagrams.'})}\n\n"
                     return
 

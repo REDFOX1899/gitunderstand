@@ -1,4 +1,4 @@
-"""AI-powered repository summary generation using Anthropic Claude."""
+"""AI-powered repository summary generation using Google Gemini."""
 
 from __future__ import annotations
 
@@ -6,25 +6,24 @@ import asyncio
 import logging
 from enum import StrEnum
 
-import anthropic
-from anthropic import RateLimitError as _RateLimitError
+from google import genai
+from google.genai import types as genai_types
 
 logger = logging.getLogger(__name__)
 
-# Retry configuration for rate-limit (429) errors
+# Retry configuration for rate-limit errors
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2  # seconds
 
-# Maximum characters to send to Claude (leave room for prompt within 200K context)
-# ~4 chars per token; 100K token budget leaves 100K for tree/prompt/response
+# Maximum characters to send to Gemini (leave room for prompt within context)
+# ~4 chars per token; 100K token budget leaves room for tree/prompt/response
 MAX_CONTENT_CHARS = 400_000
 
-# Maximum characters for chat context (smaller to leave room for conversation history
-# and to reduce token usage for rate-limit-constrained plans)
+# Maximum characters for chat context (smaller to leave room for conversation history)
 MAX_CHAT_CONTEXT_CHARS = 200_000
 
 # Default model for AI generation
-DEFAULT_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class SummaryType(StrEnum):
@@ -92,12 +91,12 @@ async def generate_summary(
     content: str,
     summary_type: SummaryType,
 ) -> str:
-    """Generate an AI summary of a repository using Anthropic Claude.
+    """Generate an AI summary of a repository using Google Gemini.
 
     Parameters
     ----------
     api_key : str
-        Anthropic Claude API key.
+        User's Gemini API key.
     tree : str
         The directory tree structure of the repository.
     content : str
@@ -115,11 +114,11 @@ async def generate_summary(
     ValueError
         If the API key is empty.
     RuntimeError
-        If the Claude API call fails.
+        If the Gemini API call fails.
 
     """
     if not api_key:
-        msg = "Claude API key is not configured"
+        msg = "A Gemini API key is required. Please set your API key in settings."
         raise ValueError(msg)
 
     # Truncate content if too large
@@ -127,7 +126,7 @@ async def generate_summary(
         content = content[:MAX_CONTENT_CHARS] + "\n\n... (content truncated for context limit)"
         logger.info("Truncated content from %d to %d chars", len(content), MAX_CONTENT_CHARS)
 
-    # Build the system prompt (Claude supports a dedicated system parameter)
+    # Build the system prompt
     type_label = SUMMARY_TYPE_LABELS.get(summary_type, summary_type.value)
     system_prompt = (
         "You are an expert software engineer analyzing a code repository.\n"
@@ -141,31 +140,37 @@ async def generate_summary(
         f"## File Contents\n{content}"
     )
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     last_exc: Exception | None = None
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = await client.messages.create(
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model=DEFAULT_MODEL,
-                max_tokens=8192,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_content}],
+                contents=user_content,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    max_output_tokens=8192,
+                    temperature=0,
+                ),
             )
-            result = response.content[0].text
+            result = response.text
             logger.info("Generated %s summary (%d chars)", summary_type.value, len(result))
             return result
-        except _RateLimitError as exc:
-            last_exc = exc
-            delay = RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "Rate limited (attempt %d/%d) for summary_type=%s, retrying in %ds",
-                attempt + 1, MAX_RETRIES, summary_type.value, delay,
-            )
-            if attempt < MAX_RETRIES - 1:
-                await asyncio.sleep(delay)
         except Exception as exc:
-            logger.exception("Claude API call failed for summary_type=%s", summary_type.value)
+            exc_str = str(exc).lower()
+            if "rate" in exc_str and "limit" in exc_str or "429" in exc_str or "resource" in exc_str:
+                last_exc = exc
+                delay = RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "Rate limited (attempt %d/%d) for summary_type=%s, retrying in %ds",
+                    attempt + 1, MAX_RETRIES, summary_type.value, delay,
+                )
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(delay)
+                continue
+            logger.exception("Gemini API call failed for summary_type=%s", summary_type.value)
             msg = f"AI summary generation failed: {exc}"
             raise RuntimeError(msg) from exc
 
@@ -186,7 +191,7 @@ async def generate_chat_response(
     Parameters
     ----------
     api_key : str
-        Anthropic Claude API key.
+        User's Gemini API key.
     tree : str
         The directory tree structure of the repository.
     content : str
@@ -207,11 +212,11 @@ async def generate_chat_response(
     ValueError
         If the API key is empty.
     RuntimeError
-        If the Claude API call fails.
+        If the Gemini API call fails.
 
     """
     if not api_key:
-        msg = "Claude API key is not configured"
+        msg = "A Gemini API key is required. Please set your API key in settings."
         raise ValueError(msg)
 
     # Truncate content if too large (smaller limit for chat to leave room for history)
@@ -220,7 +225,6 @@ async def generate_chat_response(
         logger.info("Truncated chat context to %d chars", MAX_CHAT_CONTEXT_CHARS)
 
     # Build the system prompt with repository context
-    # Claude's system parameter keeps this separate from the conversation
     system_prompt = (
         "You are an expert software engineer acting as a helpful AI assistant "
         "that has deep knowledge of a specific code repository. You can answer "
@@ -232,38 +236,51 @@ async def generate_chat_response(
         f"## File Contents\n{content}"
     )
 
-    # Build messages array — Claude uses standard user/assistant roles
-    messages: list[dict[str, str]] = []
+    # Build contents list — Gemini uses "user"/"model" roles
+    contents: list[genai_types.Content] = []
     if history:
         for msg_item in history:
-            messages.append({"role": msg_item["role"], "content": msg_item["content"]})
-    messages.append({"role": "user", "content": message})
+            role = "model" if msg_item["role"] == "assistant" else "user"
+            contents.append(genai_types.Content(
+                role=role,
+                parts=[genai_types.Part(text=msg_item["content"])],
+            ))
+    contents.append(genai_types.Content(
+        role="user",
+        parts=[genai_types.Part(text=message)],
+    ))
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     last_exc: Exception | None = None
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = await client.messages.create(
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model=DEFAULT_MODEL,
-                max_tokens=4096,
-                system=system_prompt,
-                messages=messages,
+                contents=contents,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    max_output_tokens=4096,
+                    temperature=0,
+                ),
             )
-            result = response.content[0].text
+            result = response.text
             logger.info("Generated chat response (%d chars)", len(result))
             return result
-        except _RateLimitError as exc:
-            last_exc = exc
-            delay = RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "Rate limited (attempt %d/%d) for chat, retrying in %ds",
-                attempt + 1, MAX_RETRIES, delay,
-            )
-            if attempt < MAX_RETRIES - 1:
-                await asyncio.sleep(delay)
         except Exception as exc:
-            logger.exception("Claude chat API call failed")
+            exc_str = str(exc).lower()
+            if "rate" in exc_str and "limit" in exc_str or "429" in exc_str or "resource" in exc_str:
+                last_exc = exc
+                delay = RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "Rate limited (attempt %d/%d) for chat, retrying in %ds",
+                    attempt + 1, MAX_RETRIES, delay,
+                )
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(delay)
+                continue
+            logger.exception("Gemini chat API call failed")
             msg = f"AI chat failed: {exc}"
             raise RuntimeError(msg) from exc
 

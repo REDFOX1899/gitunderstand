@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.config import get_settings
 from api.middleware import check_ai_quota, get_ai_quota_info, limiter, record_ai_usage
 from api.models import ChatRequest, SummaryRequest  # noqa: TC001
 from core.ai_summary import SummaryType, generate_chat_response, generate_summary
@@ -21,7 +19,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-settings = get_settings()
 router = APIRouter()
 
 
@@ -34,8 +31,8 @@ def _format_sse(event: dict[str, Any]) -> str:
 async def summary_available(request: Request) -> JSONResponse:
     """Check whether AI summary generation is available.
 
-    Returns ``{"available": true}`` when a Claude API key is configured,
-    ``{"available": false}`` otherwise.  Also includes usage quota info.
+    BYOK model: AI is always available — the user provides their own Gemini key.
+    Quota info is still returned for rate limiting purposes.
 
     Returns
     -------
@@ -43,15 +40,8 @@ async def summary_available(request: Request) -> JSONResponse:
         JSON object with ``available`` boolean and ``quota`` info.
 
     """
-    available = bool(settings.claude_api_key)
-    if not available:
-        logger.warning(
-            "AI summary not available: claude_api_key is empty. "
-            "ENV CLAUDE_API_KEY=%s",
-            "SET" if os.environ.get("CLAUDE_API_KEY") else "NOT SET",
-        )
     quota = get_ai_quota_info(request)
-    return JSONResponse({"available": available, "quota": quota})
+    return JSONResponse({"available": True, "quota": quota})
 
 
 @router.post("/api/summary/stream")
@@ -64,14 +54,14 @@ async def api_summary_stream(
 
     Checks the cache first — if a summary already exists for this
     digest + summary_type, it is returned immediately.  Otherwise,
-    the Claude API is called and the result is cached.
+    the Gemini API is called with the user's API key and the result is cached.
 
     Parameters
     ----------
     request : Request
         The incoming HTTP request (used by rate limiter).
     summary_request : SummaryRequest
-        Request body with ``digest_id`` and ``summary_type``.
+        Request body with ``digest_id``, ``summary_type``, and ``api_key``.
 
     Returns
     -------
@@ -83,6 +73,7 @@ async def api_summary_stream(
     async def event_generator() -> AsyncGenerator[str, None]:
         digest_id = summary_request.digest_id
         summary_type_str = summary_request.summary_type
+        api_key = summary_request.api_key
 
         # Validate summary type
         try:
@@ -94,11 +85,14 @@ async def api_summary_stream(
             })
             return
 
-        # Check API key
-        if not settings.claude_api_key:
+        # Check API key (BYOK)
+        if not api_key:
             yield _format_sse({
                 "type": "error",
-                "payload": {"message": "AI summaries are not configured (missing API key)"},
+                "payload": {
+                    "message": "A Gemini API key is required. Please set your API key in settings.",
+                    "requires_api_key": True,
+                },
             })
             return
 
@@ -139,7 +133,7 @@ async def api_summary_stream(
             "type": "generating",
             "payload": {
                 "summary_type": summary_type.value,
-                "message": f"Generating {summary_type.value.replace('_', ' ')} with Claude...",
+                "message": f"Generating {summary_type.value.replace('_', ' ')} with Gemini...",
             },
         })
 
@@ -155,10 +149,10 @@ async def api_summary_stream(
         metadata = storage.get_metadata(digest_id)
         tree = metadata.get("tree", "") if metadata else ""
 
-        # Generate summary via Claude
+        # Generate summary via Gemini
         try:
             result = await generate_summary(
-                api_key=settings.claude_api_key,
+                api_key=api_key,
                 tree=tree,
                 content=digest_content,
                 summary_type=summary_type,
@@ -219,14 +213,14 @@ async def api_chat_stream(
 
     Accepts a user message and optional conversation history,
     retrieves the digest context, and generates a conversational
-    response using Claude.
+    response using Gemini with the user's API key.
 
     Parameters
     ----------
     request : Request
         The incoming HTTP request (used by rate limiter).
     chat_request : ChatRequest
-        Request body with ``digest_id``, ``message``, and ``history``.
+        Request body with ``digest_id``, ``message``, ``history``, and ``api_key``.
 
     Returns
     -------
@@ -239,12 +233,16 @@ async def api_chat_stream(
         digest_id = chat_request.digest_id
         message = chat_request.message
         history = [{"role": m.role, "content": m.content} for m in chat_request.history]
+        api_key = chat_request.api_key
 
-        # Check API key
-        if not settings.claude_api_key:
+        # Check API key (BYOK)
+        if not api_key:
             yield _format_sse({
                 "type": "error",
-                "payload": {"message": "AI chat is not configured (missing API key)"},
+                "payload": {
+                    "message": "A Gemini API key is required. Please set your API key in settings.",
+                    "requires_api_key": True,
+                },
             })
             return
 
@@ -284,10 +282,10 @@ async def api_chat_stream(
         metadata = storage.get_metadata(digest_id)
         tree = metadata.get("tree", "") if metadata else ""
 
-        # Generate chat response via Claude
+        # Generate chat response via Gemini
         try:
             result = await generate_chat_response(
-                api_key=settings.claude_api_key,
+                api_key=api_key,
                 tree=tree,
                 content=digest_content,
                 message=message,

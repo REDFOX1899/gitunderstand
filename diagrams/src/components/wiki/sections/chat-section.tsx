@@ -4,7 +4,7 @@ import { useWikiContext } from "../wiki-context";
 import { AIChat } from "~/components/ai-chat";
 
 export function ChatSection() {
-  const { digestId, aiAvailable, ingest } = useWikiContext();
+  const { digestId, aiAvailable, ingest, getEffectiveGeminiKey } = useWikiContext();
 
   if (ingest.loading && !digestId) {
     return (
@@ -43,7 +43,7 @@ export function ChatSection() {
       <p className="mb-6 text-sm text-stone-400">
         Ask questions about the codebase
       </p>
-      <AIChat digestId={digestId} available={aiAvailable} />
+      <AIChat digestId={digestId} available={aiAvailable} apiKey={getEffectiveGeminiKey()} />
     </div>
   );
 }

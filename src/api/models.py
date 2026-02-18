@@ -191,6 +191,7 @@ class SummaryRequest(BaseModel):
         default="architecture",
         description="Summary type: architecture, code_review, onboarding, security",
     )
+    api_key: str | None = Field(default=None, description="User's Gemini API key for BYOK")
 
 
 class SummaryResponse(BaseModel):
@@ -248,6 +249,7 @@ class ChatRequest(BaseModel):
         default_factory=list,
         description="Previous conversation messages",
     )
+    api_key: str | None = Field(default=None, description="User's Gemini API key for BYOK")
 
 
 # Union type for API responses

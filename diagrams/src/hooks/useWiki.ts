@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { useIngest } from "~/hooks/useIngest";
 import { useDiagram } from "~/hooks/useDiagram";
 import { readSSEStream } from "~/lib/sse-reader";
+import { getGeminiKey } from "~/app/_actions/user";
+import { safeGetItem } from "~/lib/safe-storage";
 import type { WikiSection, SummaryState } from "~/lib/wiki-types";
 
 export function useWiki(username: string, repo: string) {
@@ -20,6 +23,23 @@ export function useWiki(username: string, repo: string) {
   const [aiAvailable, setAiAvailable] = useState(false);
   const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
   const [digestId, setDigestId] = useState<string | null>(null);
+
+  // Auth-aware Gemini key loading (same pattern as useDiagram.ts)
+  const { data: session } = useSession();
+  const dbGeminiKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (session?.user) {
+      void getGeminiKey().then((key) => { dbGeminiKeyRef.current = key; });
+    } else {
+      dbGeminiKeyRef.current = null;
+    }
+  }, [session]);
+
+  const getEffectiveGeminiKey = useCallback((): string | null => {
+    if (session?.user && dbGeminiKeyRef.current) return dbGeminiKeyRef.current;
+    return safeGetItem("gemini_key");
+  }, [session]);
 
   // Track whether ingest has been triggered
   const ingestTriggered = useRef(false);
@@ -52,7 +72,6 @@ export function useWiki(username: string, repo: string) {
     if (!digestId) return;
 
     let cancelled = false;
-    let attempt = 0;
 
     const check = async () => {
       try {
@@ -62,19 +81,13 @@ export function useWiki(username: string, repo: string) {
           quota?: { remaining: number; limit: number };
         };
         if (cancelled) return;
-        setAiAvailable(!!data.available);
+        // BYOK: AI is available if the endpoint says so AND user has a Gemini key
+        const hasKey = !!getEffectiveGeminiKey();
+        setAiAvailable(!!data.available && hasKey);
         if (data.quota) setQuota(data.quota);
-
-        if (!data.available && attempt < 3) {
-          attempt++;
-          setTimeout(() => void check(), 2000 * attempt);
-        }
       } catch {
-        if (cancelled) return;
-        if (attempt < 3) {
-          attempt++;
-          setTimeout(() => void check(), 2000 * attempt);
-        }
+        // AI availability check failed — mark unavailable
+        if (!cancelled) setAiAvailable(false);
       }
     };
 
@@ -82,16 +95,19 @@ export function useWiki(username: string, repo: string) {
     return () => {
       cancelled = true;
     };
-  }, [digestId]);
+  }, [digestId, getEffectiveGeminiKey]);
 
   // Generate a summary for a given type
   const generateSummary = useCallback(
     async (summaryType: string) => {
       if (!aiAvailable || !digestId) return;
 
-      // Don't regenerate if we already have it
+      // Don't regenerate if we already have it or if it already errored
       const existing = summaries[summaryType];
-      if (existing?.content || existing?.loading) return;
+      if (existing?.content || existing?.loading || existing?.error) return;
+
+      const apiKey = getEffectiveGeminiKey();
+      if (!apiKey) return;
 
       setSummaries((prev) => ({
         ...prev,
@@ -100,7 +116,7 @@ export function useWiki(username: string, repo: string) {
 
       await readSSEStream(
         "/api/summary/stream",
-        { digest_id: digestId, summary_type: summaryType },
+        { digest_id: digestId, summary_type: summaryType, api_key: apiKey },
         (event) => {
           switch (event.type) {
             case "complete":
@@ -139,7 +155,7 @@ export function useWiki(username: string, repo: string) {
         },
       );
     },
-    [aiAvailable, digestId, summaries],
+    [aiAvailable, digestId, summaries, getEffectiveGeminiKey],
   );
 
   // Auto-generate overview summary when AI becomes available
@@ -180,6 +196,7 @@ export function useWiki(username: string, repo: string) {
     quota,
     digestId,
     generateSummary,
+    getEffectiveGeminiKey,
     username,
     repo,
   };

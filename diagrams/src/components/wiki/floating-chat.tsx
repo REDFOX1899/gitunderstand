@@ -7,7 +7,7 @@ import { useWikiContext } from "./wiki-context";
 
 export function FloatingChat() {
   const [isOpen, setIsOpen] = useState(false);
-  const { digestId, aiAvailable, activeSection } = useWikiContext();
+  const { digestId, aiAvailable, activeSection, getEffectiveGeminiKey } = useWikiContext();
 
   // Don't show on the chat section itself
   if (activeSection === "chat") return null;
@@ -36,7 +36,7 @@ export function FloatingChat() {
               </button>
             </div>
           </div>
-          <AIChat digestId={digestId} available={aiAvailable} />
+          <AIChat digestId={digestId} available={aiAvailable} apiKey={getEffectiveGeminiKey()} />
         </div>
       )}
 

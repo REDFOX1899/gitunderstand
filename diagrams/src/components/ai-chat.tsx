@@ -20,9 +20,10 @@ const QUICK_QUESTIONS = [
 interface AIChatProps {
   digestId: string;
   available: boolean;
+  apiKey?: string | null;
 }
 
-export function AIChat({ digestId, available }: AIChatProps) {
+export function AIChat({ digestId, available, apiKey }: AIChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,6 +121,7 @@ export function AIChat({ digestId, available }: AIChatProps) {
             role: m.role,
             content: m.content,
           })),
+          api_key: apiKey ?? undefined,
         },
         (event) => {
           switch (event.type) {

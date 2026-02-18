@@ -47,8 +47,8 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
       if (isLoggedIn) {
         const result = await saveGeminiKey(apiKey);
         if (!result.success) {
-          console.error("Failed to save key:", result.error);
-          return;
+          console.error("Failed to save key to account:", result.error);
+          // Still save to localStorage as fallback
         }
       }
       onSubmit(apiKey);
