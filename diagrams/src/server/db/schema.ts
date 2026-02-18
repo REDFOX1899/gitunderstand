@@ -32,6 +32,7 @@ export const users = createTable("users", {
   }),
   image: text("image"),
   encryptedAnthropicKey: text("encrypted_anthropic_key"),
+  encryptedGeminiKey: text("encrypted_gemini_key"),
   encryptedGithubPat: text("encrypted_github_pat"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .default(sql`CURRENT_TIMESTAMP`)

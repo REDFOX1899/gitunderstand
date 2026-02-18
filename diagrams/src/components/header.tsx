@@ -36,7 +36,7 @@ export function Header() {
   };
 
   const handleApiKeySubmit = (apiKey: string) => {
-    safeSetItem("anthropic_key", apiKey);
+    safeSetItem("gemini_key", apiKey);
     setIsApiKeyDialogOpen(false);
   };
 

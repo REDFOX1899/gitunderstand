@@ -8,9 +8,9 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { safeGetItem, safeRemoveItem } from "~/lib/safe-storage";
 import {
-  saveAnthropicKey,
-  getAnthropicKey,
-  clearAnthropicKey,
+  saveGeminiKey,
+  getGeminiKey,
+  clearGeminiKey,
 } from "~/app/_actions/user";
 
 interface ApiKeyDialogProps {
@@ -29,11 +29,11 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
     if (!isOpen) return;
 
     if (isLoggedIn) {
-      void getAnthropicKey().then((key) => {
+      void getGeminiKey().then((key) => {
         if (key) setApiKey(key);
       });
     } else {
-      const storedKey = safeGetItem("anthropic_key");
+      const storedKey = safeGetItem("gemini_key");
       if (storedKey) {
         setApiKey(storedKey);
       }
@@ -45,7 +45,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
     setSaving(true);
     try {
       if (isLoggedIn) {
-        const result = await saveAnthropicKey(apiKey);
+        const result = await saveGeminiKey(apiKey);
         if (!result.success) {
           console.error("Failed to save key:", result.error);
           return;
@@ -60,9 +60,9 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
 
   const handleClear = async () => {
     if (isLoggedIn) {
-      await clearAnthropicKey();
+      await clearGeminiKey();
     }
-    safeRemoveItem("anthropic_key");
+    safeRemoveItem("gemini_key");
     setApiKey("");
   };
 
@@ -71,13 +71,13 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
       <DialogContent className="border border-stone-200 bg-white p-6 shadow-xl sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-stone-900">
-            Enter Anthropic API Key
+            Enter Gemini API Key
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div className="text-sm text-stone-600">
             GitDiagram offers infinite free diagram generations! You can also
-            provide an Anthropic API key to generate diagrams at your own cost.
+            provide a Gemini API key to generate diagrams at your own cost.
             {isLoggedIn ? (
               <>
                 {" "}
@@ -92,9 +92,9 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
             )}
             <br />
             <br />
-            <span className="font-medium">Get your Anthropic API key </span>
+            <span className="font-medium">Get your Gemini API key </span>
             <Link
-              href="https://console.anthropic.com/settings/keys"
+              href="https://aistudio.google.com/apikey"
               className="font-medium text-cyan-600 transition-colors duration-200 hover:text-cyan-700"
             >
               here
@@ -124,7 +124,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
           </details>
           <Input
             type="password"
-            placeholder="sk-ant-..."
+            placeholder="AIza..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="flex-1 rounded-md border border-stone-300 px-3 py-2 text-base font-bold placeholder:text-base placeholder:font-normal placeholder:text-stone-400 focus:ring-2 focus:ring-cyan-500"
@@ -148,7 +148,7 @@ export function ApiKeyDialog({ isOpen, onClose, onSubmit }: ApiKeyDialogProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={!apiKey.startsWith("sk-ant-") || saving}
+                disabled={!apiKey.startsWith("AIza") || saving}
                 className="bg-cyan-600 px-4 py-2 text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Key"}

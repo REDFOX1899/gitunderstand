@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from app.services.github_service import GitHubService
-from app.services.claude_service import ClaudeService
+from app.services.gemini_service import GeminiService
 from app.prompts import (
     SYSTEM_FIRST_PROMPT,
     SYSTEM_SECOND_PROMPT,
     SYSTEM_THIRD_PROMPT,
     ADDITIONAL_SYSTEM_INSTRUCTIONS_PROMPT,
 )
-from anthropic._exceptions import RateLimitError
 from pydantic import BaseModel
 import httpx
 import re
@@ -19,10 +18,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/generate", tags=["Claude"])
+router = APIRouter(prefix="/generate", tags=["Gemini"])
 
 # Initialize services
-claude_service = ClaudeService()
+gemini_service = GeminiService()
 
 # TTL cache for GitHub data — avoids duplicate API calls between /cost and /stream
 _github_cache: dict[str, tuple[float, dict]] = {}
@@ -88,14 +87,14 @@ async def get_generation_cost(request: Request, body: ApiRequest):
         file_tree = github_data["file_tree"]
         readme = github_data["readme"]
 
-        file_tree_tokens = claude_service.count_tokens(file_tree)
-        readme_tokens = claude_service.count_tokens(readme)
+        file_tree_tokens = gemini_service.count_tokens(file_tree)
+        readme_tokens = gemini_service.count_tokens(readme)
 
-        # Claude Sonnet 4.5 pricing:
-        # Input: $3 per 1M tokens ($0.000003 per token)
-        # Output: $15 per 1M tokens ($0.000015 per token)
-        input_cost = ((file_tree_tokens * 2 + readme_tokens) + 3000) * 0.000003
-        output_cost = 4000 * 0.000015
+        # Gemini 2.5 Flash pricing:
+        # Input: $0.30 per 1M tokens ($0.0000003 per token)
+        # Output: $2.50 per 1M tokens ($0.0000025 per token)
+        input_cost = ((file_tree_tokens * 2 + readme_tokens) + 3000) * 0.0000003
+        output_cost = 4000 * 0.0000025
         estimated_cost = input_cost + output_cost
 
         # Format as currency string
@@ -227,12 +226,13 @@ async def generate_stream(request: Request, body: ApiRequest):
 
                 # Token count check
                 combined_content = f"{file_tree}\n{readme}"
-                token_count = claude_service.count_tokens(combined_content)
+                token_count = gemini_service.count_tokens(combined_content)
 
-                if 100000 < token_count < 180000 and not body.api_key:
-                    yield f"data: {json.dumps({'error': f'File tree and README combined exceeds token limit (100,000). Current size: {token_count} tokens. This GitHub repository is too large for free generation, but you can continue by providing your own API key.'})}\n\n"
+                if not body.api_key:
+                    yield f"data: {json.dumps({'error': 'A Gemini API key is required. Please add your API key in settings to generate diagrams.'})}\n\n"
                     return
-                elif token_count > 180000:
+
+                if token_count > 180000:
                     yield f"data: {json.dumps({'error': f'Repository is too large (>180k tokens) for analysis. Current size: {token_count} tokens.'})}\n\n"
                     return
 
@@ -252,11 +252,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                     )
 
                 # Phase 1: Get explanation
-                yield f"data: {json.dumps({'status': 'explanation_sent', 'message': 'Sending explanation request to Claude...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'explanation_sent', 'message': 'Sending explanation request to Gemini...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'explanation', 'message': 'Analyzing repository structure...'})}\n\n"
                 explanation = ""
-                async for chunk in claude_service.call_claude_api_stream(
+                async for chunk in gemini_service.call_gemini_api_stream(
                     system_prompt=first_system_prompt,
                     data={
                         "file_tree": file_tree,
@@ -273,11 +273,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                     return
 
                 # Phase 2: Get component mapping
-                yield f"data: {json.dumps({'status': 'mapping_sent', 'message': 'Sending component mapping request to Claude...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'mapping_sent', 'message': 'Sending component mapping request to Gemini...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'mapping', 'message': 'Creating component mapping...'})}\n\n"
                 full_second_response = ""
-                async for chunk in claude_service.call_claude_api_stream(
+                async for chunk in gemini_service.call_gemini_api_stream(
                     system_prompt=SYSTEM_SECOND_PROMPT,
                     data={"explanation": explanation, "file_tree": file_tree},
                     api_key=body.api_key,
@@ -295,11 +295,11 @@ async def generate_stream(request: Request, body: ApiRequest):
                 ]
 
                 # Phase 3: Generate Mermaid diagram
-                yield f"data: {json.dumps({'status': 'diagram_sent', 'message': 'Sending diagram generation request to Claude...'})}\n\n"
+                yield f"data: {json.dumps({'status': 'diagram_sent', 'message': 'Sending diagram generation request to Gemini...'})}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'status': 'diagram', 'message': 'Generating diagram...'})}\n\n"
                 mermaid_code = ""
-                async for chunk in claude_service.call_claude_api_stream(
+                async for chunk in gemini_service.call_gemini_api_stream(
                     system_prompt=third_system_prompt,
                     data={
                         "explanation": explanation,

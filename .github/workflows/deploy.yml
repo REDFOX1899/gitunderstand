@@ -270,7 +270,7 @@ jobs:
             --max-instances 5 \
             --timeout 300 \
             --add-cloudsql-instances=gitunderstand:us-central1:gitdiagram-db \
-            --set-secrets "ANTHROPIC_API_KEY=claude-api-key:latest,GITHUB_PAT=github-pat:latest" \
+            --set-secrets "GITHUB_PAT=github-pat:latest" \
             --set-env-vars "^@^ENVIRONMENT=production@ALLOWED_ORIGINS=https://gitunderstand.com,https://www.gitunderstand.com,http://localhost:3000" \
             --project ${{ env.PROJECT_ID }}
 

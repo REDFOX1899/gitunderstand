@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Request, HTTPException
-from app.services.claude_service import ClaudeService
-from anthropic._exceptions import RateLimitError
+from app.services.gemini_service import GeminiService
 from app.prompts import SYSTEM_MODIFY_PROMPT
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/modify", tags=["Claude"])
+router = APIRouter(prefix="/modify", tags=["Gemini"])
 
 # Initialize services
-claude_service = ClaudeService()
+gemini_service = GeminiService()
 
 
 class ModifyRequest(BaseModel):
@@ -16,6 +15,7 @@ class ModifyRequest(BaseModel):
     repo: str
     username: str
     explanation: str
+    api_key: str | None = None
 
 
 @router.post("")
@@ -38,13 +38,14 @@ async def modify(request: Request, body: ModifyRequest):
         ]:
             return {"error": "Example repos cannot be modified"}
 
-        modified_mermaid_code = claude_service.call_claude_api(
+        modified_mermaid_code = gemini_service.call_gemini_api(
             system_prompt=SYSTEM_MODIFY_PROMPT,
             data={
                 "instructions": body.instructions,
                 "explanation": body.explanation,
                 "diagram": body.current_diagram,
             },
+            api_key=body.api_key,
         )
 
         # Check for BAD_INSTRUCTIONS response
@@ -52,10 +53,5 @@ async def modify(request: Request, body: ModifyRequest):
             return {"error": "Invalid or unclear instructions provided"}
 
         return {"diagram": modified_mermaid_code}
-    except RateLimitError as e:
-        raise HTTPException(
-            status_code=429,
-            detail="Service is currently experiencing high demand. Please try again in a few minutes.",
-        )
     except Exception as e:
         return {"error": str(e)}

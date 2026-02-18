@@ -21,11 +21,7 @@ async def lifespan(app: FastAPI):
     yield
     # Cleanup shared httpx client
     await app.state.http_client.aclose()
-    # Cleanup shared aiohttp sessions
-    from app.routers.generate import claude_service as gen_claude
-    from app.routers.modify import claude_service as mod_claude
-    await gen_claude.close()
-    await mod_claude.close()
+    # Gemini SDK uses sync client — no async session cleanup needed
 
 
 app = FastAPI(lifespan=lifespan)

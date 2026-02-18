@@ -6,7 +6,7 @@ import { users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { encrypt, decrypt } from "~/lib/encryption";
 
-export async function saveAnthropicKey(
+export async function saveGeminiKey(
   apiKey: string,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
@@ -18,11 +18,11 @@ export async function saveAnthropicKey(
     const encrypted = encrypt(apiKey);
     await db
       .update(users)
-      .set({ encryptedAnthropicKey: encrypted })
+      .set({ encryptedGeminiKey: encrypted })
       .where(eq(users.id, session.user.id));
     return { success: true };
   } catch (error) {
-    console.error("Error saving Anthropic key:", error);
+    console.error("Error saving Gemini key:", error);
     return { success: false, error: "Failed to save key" };
   }
 }
@@ -48,22 +48,22 @@ export async function saveGithubPat(
   }
 }
 
-export async function getAnthropicKey(): Promise<string | null> {
+export async function getGeminiKey(): Promise<string | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
 
   try {
     const result = await db
-      .select({ encryptedAnthropicKey: users.encryptedAnthropicKey })
+      .select({ encryptedGeminiKey: users.encryptedGeminiKey })
       .from(users)
       .where(eq(users.id, session.user.id))
       .limit(1);
 
-    const encrypted = result[0]?.encryptedAnthropicKey;
+    const encrypted = result[0]?.encryptedGeminiKey;
     if (!encrypted) return null;
     return decrypt(encrypted);
   } catch (error) {
-    console.error("Error retrieving Anthropic key:", error);
+    console.error("Error retrieving Gemini key:", error);
     return null;
   }
 }
@@ -88,13 +88,13 @@ export async function getGithubPat(): Promise<string | null> {
   }
 }
 
-export async function clearAnthropicKey(): Promise<{ success: boolean }> {
+export async function clearGeminiKey(): Promise<{ success: boolean }> {
   const session = await auth();
   if (!session?.user?.id) return { success: false };
 
   await db
     .update(users)
-    .set({ encryptedAnthropicKey: null })
+    .set({ encryptedGeminiKey: null })
     .where(eq(users.id, session.user.id));
   return { success: true };
 }

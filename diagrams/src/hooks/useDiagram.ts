@@ -6,7 +6,7 @@ import {
 } from "~/app/_actions/cache";
 import { getLastGeneratedDate } from "~/app/_actions/repo";
 import {
-  getAnthropicKey,
+  getGeminiKey,
   getGithubPat,
 } from "~/app/_actions/user";
 import { getCostOfGeneration } from "~/lib/fetch-backend";
@@ -66,22 +66,22 @@ export function useDiagram(username: string, repo: string) {
   // Use refs instead of state to avoid callback recreation cascades that
   // would cause getDiagram to re-fire via the useEffect dependency chain.
   const { data: session } = useSession();
-  const dbAnthropicKeyRef = useRef<string | null>(null);
+  const dbGeminiKeyRef = useRef<string | null>(null);
   const dbGithubPatRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (session?.user) {
-      void getAnthropicKey().then((key) => { dbAnthropicKeyRef.current = key; });
+      void getGeminiKey().then((key) => { dbGeminiKeyRef.current = key; });
       void getGithubPat().then((pat) => { dbGithubPatRef.current = pat; });
     } else {
-      dbAnthropicKeyRef.current = null;
+      dbGeminiKeyRef.current = null;
       dbGithubPatRef.current = null;
     }
   }, [session]);
 
-  const getEffectiveAnthropicKey = useCallback((): string | null => {
-    if (session?.user && dbAnthropicKeyRef.current) return dbAnthropicKeyRef.current;
-    return safeGetItem("anthropic_key");
+  const getEffectiveGeminiKey = useCallback((): string | null => {
+    if (session?.user && dbGeminiKeyRef.current) return dbGeminiKeyRef.current;
+    return safeGetItem("gemini_key");
   }, [session]);
 
   const getEffectiveGithubPat = useCallback((): string | null => {
@@ -108,7 +108,7 @@ export function useDiagram(username: string, repo: string) {
             username,
             repo,
             instructions,
-            api_key: getEffectiveAnthropicKey() ?? undefined,
+            api_key: getEffectiveGeminiKey() ?? undefined,
             github_pat: githubPat,
           }),
         });
@@ -310,7 +310,7 @@ export function useDiagram(username: string, repo: string) {
         setLoading(false);
       }
     },
-    [username, repo, hasUsedFreeGeneration, getEffectiveAnthropicKey],
+    [username, repo, hasUsedFreeGeneration, getEffectiveGeminiKey],
   );
 
   useEffect(() => {
@@ -319,7 +319,7 @@ export function useDiagram(username: string, repo: string) {
       const cleanDiagram = state.diagram
         .replace(/```mermaid/g, "").replace(/```/g, "").trim();
       // Cache the completed diagram with the usedOwnKey flag
-      const hasApiKey = !!getEffectiveAnthropicKey();
+      const hasApiKey = !!getEffectiveGeminiKey();
       void cacheDiagramAndExplanation(
         username,
         repo,
@@ -334,7 +334,7 @@ export function useDiagram(username: string, repo: string) {
     } else if (state.status === "error") {
       setLoading(false);
     }
-  }, [state.status, state.diagram, username, repo, state.explanation, getEffectiveAnthropicKey]);
+  }, [state.status, state.diagram, username, repo, state.explanation, getEffectiveGeminiKey]);
 
   const getDiagram = useCallback(async () => {
     setCheckingCache(true);
@@ -537,7 +537,7 @@ export function useDiagram(username: string, repo: string) {
     setError("");
 
     // Store the key first
-    safeSetItem("anthropic_key", apiKey);
+    safeSetItem("gemini_key", apiKey);
 
     // Then generate diagram using stored key
     const github_pat = getEffectiveGithubPat();
