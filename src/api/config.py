@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     gcp_project_id: str = "gitunderstand"
     gcs_bucket_name: str = "gitunderstand-digests"
     github_token: str = ""
-    claude_api_key: str = ""
     default_file_size_kb: int = 5120
     max_file_size_kb: int = 102400
 
@@ -73,8 +72,7 @@ def get_settings() -> Settings:
     """
     s = Settings()
     logger.info(
-        "Settings loaded: claude_api_key=%s, use_local_storage=%s",
-        "SET" if s.claude_api_key else "NOT SET",
+        "Settings loaded: use_local_storage=%s",
         s.use_local_storage,
     )
     return s

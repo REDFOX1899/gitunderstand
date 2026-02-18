@@ -38,7 +38,6 @@ services:
       USE_LOCAL_STORAGE: "true"
       LOCAL_STORAGE_PATH: "/tmp/gitunderstand"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
-      CLAUDE_API_KEY: "${CLAUDE_API_KEY:-}"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
     volumes:
       - ./src:/app/src:ro
@@ -54,7 +53,6 @@ services:
       - "8000:8000"
     environment:
       ENVIRONMENT: "development"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       GITHUB_PAT: "${GITHUB_PAT:-}"
       ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:8080"
     depends_on:

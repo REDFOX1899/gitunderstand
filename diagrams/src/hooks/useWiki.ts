@@ -21,7 +21,6 @@ export function useWiki(username: string, repo: string) {
   // AI summaries state
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({});
   const [aiAvailable, setAiAvailable] = useState(false);
-  const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
   const [digestId, setDigestId] = useState<string | null>(null);
 
   // Auth-aware Gemini key loading (same pattern as useDiagram.ts)
@@ -76,15 +75,11 @@ export function useWiki(username: string, repo: string) {
     const check = async () => {
       try {
         const res = await fetch("/api/summary/available");
-        const data = (await res.json()) as {
-          available: boolean;
-          quota?: { remaining: number; limit: number };
-        };
+        const data = (await res.json()) as { available: boolean };
         if (cancelled) return;
         // BYOK: AI is available if the endpoint says so AND user has a Gemini key
         const hasKey = !!getEffectiveGeminiKey();
         setAiAvailable(!!data.available && hasKey);
-        if (data.quota) setQuota(data.quota);
       } catch {
         // AI availability check failed — mark unavailable
         if (!cancelled) setAiAvailable(false);
@@ -128,8 +123,6 @@ export function useWiki(username: string, repo: string) {
                   error: null,
                 },
               }));
-              if (event.payload.quota)
-                setQuota(event.payload.quota as { remaining: number; limit: number });
               break;
             case "error":
               setSummaries((prev) => ({
@@ -193,7 +186,6 @@ export function useWiki(username: string, repo: string) {
     diagram,
     summaries,
     aiAvailable,
-    quota,
     digestId,
     generateSummary,
     getEffectiveGeminiKey,

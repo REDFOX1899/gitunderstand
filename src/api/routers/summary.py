@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.middleware import check_ai_quota, get_ai_quota_info, limiter, record_ai_usage
+from api.middleware import limiter
 from api.models import ChatRequest, SummaryRequest  # noqa: TC001
 from core.ai_summary import SummaryType, generate_chat_response, generate_summary
 from storage.factory import get_storage
@@ -32,16 +32,15 @@ async def summary_available(request: Request) -> JSONResponse:
     """Check whether AI summary generation is available.
 
     BYOK model: AI is always available — the user provides their own Gemini key.
-    Quota info is still returned for rate limiting purposes.
+    No server-side quota — users pay for their own API usage.
 
     Returns
     -------
     JSONResponse
-        JSON object with ``available`` boolean and ``quota`` info.
+        JSON object with ``available`` boolean.
 
     """
-    quota = get_ai_quota_info(request)
-    return JSONResponse({"available": True, "quota": quota})
+    return JSONResponse({"available": True})
 
 
 @router.post("/api/summary/stream")
@@ -98,7 +97,7 @@ async def api_summary_stream(
 
         storage = get_storage()
 
-        # Check cache first (cached results are free — don't count against quota)
+        # Check cache first
         cached_summary = storage.get_summary(digest_id, summary_type.value)
         if cached_summary:
             logger.info("Serving cached %s summary for digest %s", summary_type.value, digest_id)
@@ -108,22 +107,6 @@ async def api_summary_stream(
                     "summary_type": summary_type.value,
                     "content": cached_summary,
                     "cached": True,
-                },
-            })
-            return
-
-        # Check AI usage quota (only for non-cached requests)
-        allowed, _remaining, reset_secs = check_ai_quota(request)
-        if not allowed:
-            minutes = reset_secs // 60
-            yield _format_sse({
-                "type": "error",
-                "payload": {
-                    "message": (
-                        f"Usage limit reached (5 AI requests per 6 hours). "
-                        f"Resets in ~{minutes} minutes. Cached summaries are still available."
-                    ),
-                    "quota_exceeded": True,
                 },
             })
             return
@@ -170,9 +153,6 @@ async def api_summary_stream(
             })
             return
 
-        # Record AI usage (only after successful generation)
-        record_ai_usage(request)
-
         # Cache the result
         try:
             storage.store_summary(digest_id, summary_type.value, result)
@@ -180,15 +160,13 @@ async def api_summary_stream(
         except Exception:
             logger.exception("Failed to cache summary for digest %s", digest_id)
 
-        # Emit complete event with updated quota
-        quota = get_ai_quota_info(request)
+        # Emit complete event
         yield _format_sse({
             "type": "complete",
             "payload": {
                 "summary_type": summary_type.value,
                 "content": result,
                 "cached": False,
-                "quota": quota,
             },
         })
 
@@ -246,22 +224,6 @@ async def api_chat_stream(
             })
             return
 
-        # Check AI usage quota
-        allowed, _remaining, reset_secs = check_ai_quota(request)
-        if not allowed:
-            minutes = reset_secs // 60
-            yield _format_sse({
-                "type": "error",
-                "payload": {
-                    "message": (
-                        f"Usage limit reached (5 AI requests per 6 hours). "
-                        f"Resets in ~{minutes} minutes."
-                    ),
-                    "quota_exceeded": True,
-                },
-            })
-            return
-
         storage = get_storage()
 
         # Emit thinking event
@@ -304,14 +266,10 @@ async def api_chat_stream(
             })
             return
 
-        # Record AI usage
-        record_ai_usage(request)
-
-        # Emit complete event with the response and updated quota
-        quota = get_ai_quota_info(request)
+        # Emit complete event
         yield _format_sse({
             "type": "complete",
-            "payload": {"content": result, "quota": quota},
+            "payload": {"content": result},
         })
 
     return StreamingResponse(

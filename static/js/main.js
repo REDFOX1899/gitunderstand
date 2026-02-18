@@ -952,7 +952,7 @@ function switchAITab(tab) {
 
 function generateAISummary(summaryType) {
     if (!window._aiAvailable) {
-        showAIError('AI features are not configured. Set CLAUDE_API_KEY to enable.');
+        showAIError('AI features require a Gemini API key. Please set your key in settings.');
         return;
     }
     if (!window.currentDigestId) {
@@ -1084,7 +1084,7 @@ function sendChatMessage() {
     if (window._chatBusy) { return; }
 
     if (!window._aiAvailable) {
-        _appendChatError('AI features are not configured. Set CLAUDE_API_KEY to enable.');
+        _appendChatError('AI features require a Gemini API key. Please set your key in settings.');
         return;
     }
     if (!window.currentDigestId) {
