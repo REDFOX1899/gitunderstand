@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { exampleRepos } from "~/lib/exampleRepos";
+import { parseGitHubUrl, isParseError } from "~/lib/github-url";
 import {
   FileText,
   GitBranch,
   MessageCircle,
   FolderTree,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 const features = [
@@ -44,29 +46,55 @@ const features = [
 export default function LandingPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [error, setError] = useState("");
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Autofocus the input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Live-parse the input for preview feedback
+  const parsed = repoUrl.trim() ? parseGitHubUrl(repoUrl) : null;
+  const isValid = parsed !== null && !isParseError(parsed);
+
+  const navigateTo = useCallback(
+    (username: string, repo: string) => {
+      setIsNavigating(true);
+      setError("");
+      router.push(
+        `/${encodeURIComponent(username)}/${encodeURIComponent(repo)}`,
+      );
+    },
+    [router],
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isNavigating) return;
     setError("");
 
-    const trimmed = repoUrl.trim();
-    const githubUrlPattern =
-      /^https?:\/\/github\.com\/([a-zA-Z0-9-_]+)\/([a-zA-Z0-9-_.]+)\/?$/;
-    const match = githubUrlPattern.exec(trimmed);
-
-    if (!match?.[1] || !match?.[2]) {
-      setError("Please enter a valid GitHub repository URL");
+    const result = parseGitHubUrl(repoUrl);
+    if (isParseError(result)) {
+      setError(result.error);
       return;
     }
 
-    const username = encodeURIComponent(match[1]);
-    const repo = encodeURIComponent(match[2]);
-    router.push(`/${username}/${repo}`);
+    navigateTo(result.username, result.repo);
   };
 
-  const handleExampleClick = (path: string) => {
-    router.push(path);
+  const handleExampleClick = (name: string, path: string) => {
+    if (isNavigating) return;
+    // Show the repo in the input first so users see what they're exploring
+    setRepoUrl(`github.com${path}`);
+    setError("");
+    setIsNavigating(true);
+    // Brief delay so the user sees the input fill before navigating
+    setTimeout(() => {
+      router.push(path);
+    }, 150);
   };
 
   return (
@@ -88,31 +116,78 @@ export default function LandingPage() {
           {/* Search Bar */}
           <form
             onSubmit={handleSubmit}
+            aria-label="Repository search"
+            aria-busy={isNavigating}
             className="mx-auto mt-8 max-w-2xl"
           >
             <div className="flex gap-3">
               <Input
-                placeholder="https://github.com/username/repo"
+                ref={inputRef}
+                placeholder="Paste a GitHub URL or type user/repo"
+                aria-label="GitHub repository URL"
                 className="flex-1 rounded-lg border-stone-300 px-4 py-6 text-base font-medium placeholder:text-stone-400 focus:ring-2 focus:ring-cyan-500 sm:text-lg"
                 value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                required
+                onChange={(e) => {
+                  setRepoUrl(e.target.value);
+                  setError("");
+                }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                disabled={isNavigating}
               />
               <Button
                 type="submit"
-                className="rounded-lg bg-cyan-600 px-6 py-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-700 sm:text-lg"
+                disabled={isNavigating}
+                aria-label="Explore repository"
+                className="rounded-lg bg-cyan-600 px-6 py-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:opacity-70 sm:text-lg"
               >
-                Explore
-                <ArrowRight className="ml-2 h-5 w-5" />
+                {isNavigating ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Explore
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </Button>
             </div>
-            {error && (
-              <p className="mt-2 text-sm text-red-600">{error}</p>
-            )}
+
+            {/* Feedback row: error, parsed preview, or keyboard hint */}
+            <div className="mt-2 h-5 text-sm">
+              {error ? (
+                <p className="text-red-600" role="alert">
+                  {error}
+                </p>
+              ) : isNavigating && isValid ? (
+                <p className="text-cyan-600">
+                  Navigating to{" "}
+                  <span className="font-medium">
+                    {(parsed as { username: string; repo: string }).username}/
+                    {(parsed as { username: string; repo: string }).repo}
+                  </span>
+                  ...
+                </p>
+              ) : isValid ? (
+                <p className="text-stone-400">
+                  <span className="font-medium text-stone-600">
+                    {(parsed as { username: string; repo: string }).username}/
+                    {(parsed as { username: string; repo: string }).repo}
+                  </span>
+                  {" "}— press Enter to explore
+                </p>
+              ) : isFocused && !repoUrl.trim() ? (
+                <p className="text-stone-400">
+                  Try pasting a GitHub URL or typing <span className="font-mono">user/repo</span>
+                </p>
+              ) : null}
+            </div>
           </form>
 
           {/* Example Repos */}
-          <div className="mt-6">
+          <div className="mt-4">
             <p className="mb-3 text-sm text-stone-400">
               Try an example:
             </p>
@@ -120,8 +195,9 @@ export default function LandingPage() {
               {Object.entries(exampleRepos).map(([name, path]) => (
                 <button
                   key={name}
-                  onClick={() => handleExampleClick(path)}
-                  className="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700"
+                  onClick={() => handleExampleClick(name, path)}
+                  disabled={isNavigating}
+                  className="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-50"
                 >
                   {name}
                 </button>
@@ -173,10 +249,7 @@ export default function LandingPage() {
           </p>
           <Button
             onClick={() => {
-              const input = document.querySelector<HTMLInputElement>(
-                'input[placeholder*="github.com"]',
-              );
-              input?.focus();
+              inputRef.current?.focus();
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             className="mt-6 rounded-lg bg-cyan-600 px-8 py-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-700"
